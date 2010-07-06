@@ -101,7 +101,6 @@ package {
         function(event:HydnaDataEvent) : void {
           var data:String = event.data.readUTF();
           output.appendText("Receivied '" + data + "' from network...\n\n");
-          hydna.shutdown();
         }
       );
 
