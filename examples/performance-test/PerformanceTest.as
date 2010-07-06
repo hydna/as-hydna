@@ -94,7 +94,7 @@ package {
 
       stream.addEventListener(HydnaStreamEvent.DATA, 
         function(event:HydnaStreamEvent) : void {
-          if (++messagesReceived == 100000) {
+          if (++messagesReceived == MESSAGE_COUNT) {
             var time:Number = ((new Date()).getTime() - starttime); 
             output.appendText("Done in " + time + " milliseconds\n");
           }
