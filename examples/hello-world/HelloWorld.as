@@ -1,4 +1,4 @@
-// PerformanceTest.as
+// HelloWorld.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -65,7 +65,8 @@ package {
       send.text = "Click to send 'Hello World' message";
       send.autoSize = TextFieldAutoSize.CENTER;
       send.background = true;
-      send.backgroundColor = 0xEEEEEE;
+      send.backgroundColor = 0xAAAAAA;
+      send.visible = false;
       send.x = 100;
       send.width = 120;
       send.addEventListener(MouseEvent.CLICK, 
@@ -91,7 +92,7 @@ package {
       stream.addEventListener(HydnaStreamEvent.OPEN, 
         function() : void {
           output.appendText("Connected with Hydna Network\n");
-          send.backgroundColor = 0xAAAAAA;
+          send.visible = true;
         }
       );
 
