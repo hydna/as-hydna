@@ -41,8 +41,8 @@ package {
 
   import com.hydna.Hydna;
   import com.hydna.HydnaAddr;
-  import com.hydna.HydnaStream;
-  import com.hydna.HydnaStreamMode;
+  import com.hydna.HydnaDataStream;
+  import com.hydna.HydnaDataStreamMode;
   import com.hydna.HydnaStreamEvent;
   
   /**
@@ -60,7 +60,7 @@ package {
       var output:TextField = new TextField();
       var send:TextField = new TextField();
       var hydna:Hydna;
-      var stream:HydnaStream;
+      var stream:HydnaDataStream;
       
       send.text = "Click to send 'Hello World' message";
       send.autoSize = TextFieldAutoSize.CENTER;
@@ -87,7 +87,7 @@ package {
       hydna = Hydna.connect(HOST, PORT);
       
       stream = hydna.open(HydnaAddr.fromHex(ADDRESS), 
-                          HydnaStreamMode.READWRITE);
+                          HydnaDataStreamMode.READWRITE);
       
       stream.addEventListener(HydnaStreamEvent.OPEN, 
         function() : void {

@@ -39,40 +39,55 @@ package com.hydna {
   
   import com.hydna.HydnaAddr;
   import com.hydna.HydnaStreamEvent;
-  import com.hydna.HydnaStreamMode;
   import com.hydna.HydnaPacket;
 
   public class HydnaStream extends EventDispatcher {
-    
+
+    private var _type:String;
     private var _addr:HydnaAddr = null;
-    private var _mode:String = null;
-    private var _open:Boolean = false;
     private var _originalAddr:HydnaAddr = null;
     private var _socket:Socket = null;
-    private var _token:String = null;
+    private var _connected:Boolean = false;
     
     /**
      * Initializes a new HydnaStream instance
      */
-    public function HydnaStream(socket:Socket, 
-                                  addr:HydnaAddr, 
-                                  mode:String,
-                                  token:String) {
+    public function HydnaStream(type:String,
+                                socket:Socket, 
+                                addr:HydnaAddr) {
+      _type = type;
       _socket = socket;
       _addr = addr;
       _originalAddr = addr;
-      _mode = mode;
-      _token = token;
+    }
+
+    /**
+     *  Returns the underlying {flash.net.Socket} Socket instance.
+     */
+    public function get socket() : Socket {
+      return _socket;
     }
     
     /**
-     *  Returns open status for this HydnaStream instance.
-     *
-     *  @return {Boolean} true if stream is open to the specified
-     *                    HydnaAddr else false.
+     *  Return the connected state for this HydnaStream instance.
      */
-    public function get isOpen() : Boolean {
-      return _open;
+    public function get connected() : Boolean {
+      return _connected;
+    }
+
+    /**
+     *  Return the connected state for this HydnaStream instance.
+     */
+    internal function setConnected(value:Boolean) : void {
+      _connected = value;
+    }
+    
+    /**
+     *  Returns the type of this HydnaStream instance. Valid values are:
+     *  HydnaStreamType.DATA, HydnaStreamType.PING and HydnaStreamType.META.
+     */
+    public function get type() : String {
+      return _type;
     }
 
     /**
@@ -82,6 +97,13 @@ package com.hydna {
      */
     public function get addr() : HydnaAddr {
       return _addr;
+    }
+    
+    /**
+     *  Set's the HydnaAddr for this instance.
+     */
+    internal function setAddr(value:HydnaAddr) : void {
+      _addr = value;
     }
 
     /**
@@ -93,124 +115,16 @@ package com.hydna {
       return _originalAddr;
     }
     
-    /**
-     *  Returns the mode of the HydnaStram
-     *
-     *  @return {String} current mode
-     */
-    public function get mode() : String {
-      return _mode;
-    }
-    
-    public function write(data:ByteArray) : void {
-      
-      if (_open == false) {
-        throw new Error("Stream is not open.");
-      }
-
-      if (_mode == HydnaStreamMode.READ) {
-        throw new Error("Stream is not writable");
-      }
-      
-      _socket.writeShort(data.length + HydnaPacket.HEADER_LENGTH);
-      _socket.writeByte(HydnaPacket.EMIT);
-      _socket.writeByte(0);
-      _socket.writeBytes(_addr.bytes, 0, _addr.bytes.length);
-      _socket.writeBytes(data, 0, data.length);
-      _socket.flush();
-    }
-    
     public function close() : void {
       internalClose();
     }
     
-    public function writeString(value:String) : void {
-      var data:ByteArray = new ByteArray();
-      data.writeUTF(value);
-      write(data);
-    }
-    
-    /**
-     *  Internal method. Sends an open request from stream address.
-     * 
-     */
-    internal function open() : void {
-      var addr:HydnaAddr = this._addr;
-      var token:String = this._token;
-      var packetLength:Number = 13;
-      var tokenBuffer:ByteArray = null;
-      var mode:Number = 0;
-      
-      switch (this._mode) {
-        case HydnaStreamMode.READ: 
-          mode = 1;
-          break;
-          
-        case HydnaStreamMode.WRITE: 
-          mode = 2;
-          break;
-          
-        case HydnaStreamMode.READWRITE: 
-          mode = 3;
-          break;
-      }
-      
-      function postOpen() : void {
-
-        if (token !== null) {
-          tokenBuffer = new ByteArray();
-          tokenBuffer.writeUTF(token);
-          packetLength += tokenBuffer.length;
-        }
-
-        _socket.writeShort(packetLength);
-        _socket.writeByte(HydnaPacket.OPEN);
-        _socket.writeByte(0);
-        _socket.writeBytes(addr.bytes, 0, addr.bytes.length);
-        _socket.writeByte(mode);
-
-        if (tokenBuffer) {
-          _socket.writeBytes(tokenBuffer, 0, tokenBuffer.length);
-        }
-        
-        _socket.flush();
-      }
-      
-      if (_socket.connected) {
-        postOpen();
-      } else {
-        _socket.addEventListener(Event.CONNECT, postOpen);
-      }
-    }
-    
     internal function internalClose(error:Number=0) : void {
-      if (_open) {
+      if (_connected) {
         var event:HydnaStreamEvent = new HydnaStreamEvent(HydnaStreamEvent.CLOSE);
-        _open = false;
+        _connected = false;
         dispatchEvent(event);
       }
-    }
-    
-    internal function processData(buffer:ByteArray, length:Number) : void {
-      var tempBuffer:ByteArray = new ByteArray();
-      var event:HydnaStreamEvent;
-      buffer.readBytes(tempBuffer, 0, length);
-      event = new HydnaStreamEvent(HydnaStreamEvent.DATA, 0, tempBuffer);
-      dispatchEvent(event);
-    }
-
-    internal function setOpenState(code:Number, responseAddr:String) : void {
-      var event:HydnaStreamEvent = null;
-      
-      if (code == 0) {
-        _open = true;
-        _addr = HydnaAddr.fromChars(responseAddr);
-        event = new HydnaStreamEvent(HydnaStreamEvent.OPEN);
-      } else {
-        event = new HydnaStreamEvent(HydnaStreamEvent.ERROR, code);
-      }
-      
-      dispatchEvent(event);
     }
     
   }

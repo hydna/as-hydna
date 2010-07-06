@@ -1,4 +1,4 @@
-// HydnaPacket.as
+// HydnaErrorEvent.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -32,27 +32,48 @@
  */ 
 package com.hydna {
   
-  /**
-   *  A Hydna Packet utility class. Should not be used directly.
-   *
-   */
-  public class HydnaPacket {
-    
-    public static const HEADER_LENGTH:Number = 12;
-    
-    public static const PING:Number      = 0x01;
-    
-    public static const OPEN:Number      = 0x02;
-    public static const EMIT:Number      = 0x04;
-    public static const CLOSE:Number     = 0x05;
+  import flash.events.Event;
 
-    public static const OPENSTAT:Number  = 0x06;
-    public static const DATA:Number      = 0x08;
-    public static const INTERRUPT:Number = 0x09;
-
-
+  public class HydnaErrorEvent extends Event {
+    
+    public static const ERROR:String = "error";
+    
+    private var _code:Number = 0;
+    private var _message:String;
+    
+    /**
+     *  Constructor for the HydnaErrorEvent
+     *
+     *  @param {Number} code The error code for this event. Default is 0
+     *  @param {String} message An optional message to associate with the
+     *                          event.
+     */
+    public function HydnaErrorEvent(code:Number=0, 
+                                     message:String="Unkown Error") {
+      super(ERROR, false, false);
+      _code = code;
+      _message = message;
+    }
+    
+    /**
+     *  Gets the associated error message for this HydnaErrorEvent instance.
+     *
+     *  @return {String} error message.
+     */
+    public function get message() : String {
+      return _buffer;
+    }
+    
+    /**
+     *  Returns the error code for this HydnaErrorEvent instance.
+     *
+     *  @return {Number} the error code.
+     */
+    public function get code() : Number {
+      return _code;
+    }
+    
   }
-
-
-
+  
+  
 }

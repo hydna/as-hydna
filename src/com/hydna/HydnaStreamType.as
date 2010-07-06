@@ -1,4 +1,4 @@
-// HydnaStreamState.as
+// HydnaStreamType.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -32,11 +32,11 @@
  */ 
 package com.hydna {
   
-  public class HydnaStreamMode {
+  public class HydnaStreamType {
     
-    public static const READ:String = "read";
-    public static const WRITE:String = "write";
-    public static const READWRITE:String = "readwrite";
+    public static const DATA:String = "data";
+    public static const PING:String = "ping";
+    public static const META:String = "meta";
     
   }
   

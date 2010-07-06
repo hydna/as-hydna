@@ -1,4 +1,4 @@
-// HydnaPacket.as
+// HydnaStreamState.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -32,27 +32,12 @@
  */ 
 package com.hydna {
   
-  /**
-   *  A Hydna Packet utility class. Should not be used directly.
-   *
-   */
-  public class HydnaPacket {
+  public class HydnaDataStreamMode {
     
-    public static const HEADER_LENGTH:Number = 12;
+    public static const READ:String = "read";
+    public static const WRITE:String = "write";
+    public static const READWRITE:String = "readwrite";
     
-    public static const PING:Number      = 0x01;
-    
-    public static const OPEN:Number      = 0x02;
-    public static const EMIT:Number      = 0x04;
-    public static const CLOSE:Number     = 0x05;
-
-    public static const OPENSTAT:Number  = 0x06;
-    public static const DATA:Number      = 0x08;
-    public static const INTERRUPT:Number = 0x09;
-
-
   }
-
-
-
+  
 }

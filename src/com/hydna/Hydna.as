@@ -41,25 +41,44 @@ package com.hydna {
   import flash.utils.ByteArray;
   
   import com.hydna.HydnaStream;
-  import com.hydna.HydnaStreamMode;
+  import com.hydna.HydnaDataStream;
+  import com.hydna.HydnaDataStreamMode;
   
-  public class Hydna extends EventDispatcher{
+  public class Hydna extends EventDispatcher {
     
-    private var _connceted:Boolean = false;
+    public static const MAJOR_VERSION:Number = 1;
+    public static const MINOR_VERSION:Number = 0;
+    
+    public static const DEFAULT_HOST:String = "127.0.0.1";
+    public static const DEFAULT_PORT:Number = 7015;
+    
     private var _socket:Socket = null;
     private var _streams:Object = new Object();
 
     private var receiveBuffer:ByteArray = new ByteArray();
     
+    /**
+     *  Creates a Hydna object. If no parameters are specified, the default
+     *  host and port is used. 
+     *
+     *  @param {String} host The name of the host to connect to. Leave blank
+     *                       to use default host.
+     *  @param {Number} port The port number to connect to. Leave blank to
+     *                       use default port.
+     *  @return {com.hydna.Hydna} the newly created Hydna instance.
+     */
     public static function connect(host:String = null, 
-                                            port:uint = 0) : Hydna {
+                                   port:uint = 0) : Hydna {
       return new Hydna(host, port);
     }
     
     /**
-     * 
+     *  Creates a Hydna object. 
+     *
+     *  @param {String} host The name of the host to connect to. 
+     *  @param {Number} port The port number to connect to. 
      */
-    public function Hydna(host:String = null, port:uint = 0) {
+    public function Hydna(host:String, port:uint) {
       super();
 
       _socket = new Socket(host, port);
@@ -73,19 +92,28 @@ package com.hydna {
     }
     
     /**
-     *  Opens a stream on network.
+     *  Indicates whether this Hydna object is currently connected. A call to 
+     *  this property returns a value of true if currently connected, or false 
+     *  otherwise.
+     */
+    public function get connected() : Boolean {
+      return _socket.connected;
+    }
+    
+    /**
+     *  Opens a stream on the Hydna network.
      *
      */
     public function open(addr:HydnaAddr, 
-                         mode:String = HydnaStreamMode.READ, 
-                         token:String = null) : HydnaStream {
-      var stream:HydnaStream = null;
+                         mode:String = HydnaDataStreamMode.READ, 
+                         token:String = null) : HydnaDataStream {
+      var stream:HydnaDataStream = null;
       var addrValue:String = addr.chars;
       
       switch (mode) {
-        case HydnaStreamMode.READ:
-        case HydnaStreamMode.WRITE: 
-        case HydnaStreamMode.READWRITE: 
+        case HydnaDataStreamMode.READ:
+        case HydnaDataStreamMode.WRITE: 
+        case HydnaDataStreamMode.READWRITE: 
           break;
           
         default: throw new Error("Illegal mode");
@@ -95,13 +123,22 @@ package com.hydna {
         return _streams[addrValue];
       }
       
-      stream = new HydnaStream(_socket, addr, mode, token);
+      stream = new HydnaDataStream(_socket, addr, mode, token);
       
       _streams[addrValue] = stream;
       
       stream.open();
       
       return stream;
+    }
+    
+    /**
+     *
+     *  @param {Boolean} graceful Closes each individual stream before 
+     *                            final shutdown.
+     */
+    public function shutdown(graceful:Boolean = false) {
+      
     }
     
     private function connectHandler(event:Event) : void {
@@ -126,79 +163,140 @@ package com.hydna {
       var packetLength:Number;
       var packetFlag:Number;
       var packetReserved:Number;
-      var packetAddr:String = ""; 
-      var responseAddr:String = ""; 
+      var packetAddr:String; 
       var stream:HydnaStream = null;
-      var stateCode:Number = 0;
-      var index:Number = 8;
-      
-      trace("socketDataHandler: " + event); 
+      var index:Number;
       
       _socket.readBytes(receiveBuffer, 
                         receiveBuffer.length, 
                         _socket.bytesAvailable);
       
-      receiveBuffer.position = 0;
-      
-      if (receiveBuffer.length < HydnaPacket.HEADER_LENGTH) {
-        return;
-      }
-      
-      packetLength = receiveBuffer.readUnsignedShort();
-      
-      if (receiveBuffer.bytesAvailable < (packetLength - HydnaPacket.HEADER_LENGTH)) {
-        return;
-      }
+      while (receiveBuffer.length > HydnaPacket.HEADER_LENGTH) {
 
-      packetFlag = receiveBuffer.readUnsignedByte();
-      packetReserved = receiveBuffer.readUnsignedByte();
-      
-      while (index--) {
-        packetAddr += String.fromCharCode(receiveBuffer.readUnsignedByte());
-      }
-      
-      stream = _streams[packetAddr];
-      
-      if (!stream) {
-        // Ignore packet
-        trace("ignore packet, stream not found");
-        packetFlag = 0;
-      }
-      
-      switch (packetFlag) {
+        receiveBuffer.position = 0;
+        packetAddr = "";
+        index = 8;
+                
+        packetLength = receiveBuffer.readUnsignedShort();
 
-        case HydnaPacket.OPENSTAT:
-        
-          stateCode = receiveBuffer.readUnsignedByte();
+        if (receiveBuffer.bytesAvailable < (packetLength - 2)) {
+          return;
+        }
 
-          index = 8;
+        packetFlag = receiveBuffer.readUnsignedByte();
+        packetReserved = receiveBuffer.readUnsignedByte();
 
-          while (index--) {
-            responseAddr += String.fromCharCode(receiveBuffer.readUnsignedByte());
+        while (index--) {
+          packetAddr += String.fromCharCode(receiveBuffer.readUnsignedByte());
+        }
+
+        stream = _streams[packetAddr];
+
+        if (!stream) {
+          // Ignore packet
+          trace("ignore packet, stream not found");
+        } else {
+
+          switch (packetFlag) {
+
+            case HydnaPacket.OPENSTAT:
+              processOpenStatPacket(stream, receiveBuffer, packetLength);
+              break;
+
+            case HydnaPacket.DATA:
+              processDataPacket(stream, receiveBuffer, packetLength);
+              break;
+
+            case HydnaPacket.INTERRUPT:
+              processInterruptPacket(stream, receiveBuffer, packetLength);
+              break;
           }
-          
-          stream.setOpenState(stateCode, responseAddr);
-          
-          break;
-          
-        case HydnaPacket.DATA:
-          stream.processData(receiveBuffer, packetLength - HydnaPacket.HEADER_LENGTH);
-          break;
-          
-        case HydnaPacket.INTERRUPT:
-          trace("TODO!");
-          break;
-      }
-      
-      if (receiveBuffer.length > packetLength) {
-        var newSize:Number = receiveBuffer.length - packetLength;
-        var tempBuffer:ByteArray = new ByteArray();
+        }
+
+        if (receiveBuffer.length > packetLength) {
+          var newSize:Number = receiveBuffer.length - packetLength;
+          var tempBuffer:ByteArray = new ByteArray();
+          receiveBuffer.readBytes(tempBuffer, 0, newSize);
+          receiveBuffer = tempBuffer;
+        } else {
+          receiveBuffer = new ByteArray();
+        }
         
-        
-        receiveBuffer.readBytes(tempBuffer, 0, newSize);
-        receiveBuffer = tempBuffer;
       }
     }
+    
+    private function processOpenStatPacket(stream:HydnaStream,
+                                           buffer:ByteArray,
+                                           packetLength:Number) : void {
+      var dataStream:HydnaDataStream = HydnaDataStream(stream);
+      var dataLength:Number = packetLength - HydnaPacket.HEADER_LENGTH;
+      var index:Number = 8;
+      var responseAddr:String = "";
+      var code:Number;
+      var event:HydnaStreamEvent;
+
+      if (dataStream == null) {
+        return;
+      }
+      
+      if (dataLength < 9) {
+        // Ignore packet, invalid format
+        return;
+      }
+
+      code = buffer.readUnsignedByte();
+
+      while (index--) {
+        responseAddr += String.fromCharCode(buffer.readUnsignedByte());
+      }
+      
+      if (code == 0) {
+        dataStream.setConnected(true);
+        dataStream.setAddr(HydnaAddr.fromChars(responseAddr));
+        event = new HydnaStreamEvent(HydnaStreamEvent.OPEN);
+      } else {
+        event = new HydnaStreamEvent(HydnaStreamEvent.ERROR, code);
+      }
+      
+      dataStream.dispatchEvent(event);
+    }
+    
+    private function processDataPacket(stream:HydnaStream,
+                                       buffer:ByteArray,
+                                       packetLength:Number) : void {
+      var dataStream:HydnaDataStream = HydnaDataStream(stream);
+      var dataLength:Number = packetLength - HydnaPacket.HEADER_LENGTH;
+      var dataBuffer:ByteArray;
+      var event:HydnaStreamEvent;
+      
+      if (dataStream == null) {
+        return;
+      }
+      
+      dataBuffer = new ByteArray();
+      
+      buffer.readBytes(dataBuffer, 0, dataLength);
+      event = new HydnaStreamEvent(HydnaStreamEvent.DATA, 0, dataBuffer);
+      dataStream.dispatchEvent(event);
+    }
+
+    private function processInterruptPacket(stream:HydnaStream,
+                                            buffer:ByteArray,
+                                            packetLength:Number) : void {
+      var dataStream:HydnaDataStream = HydnaDataStream(stream);
+      var dataLength:Number = packetLength - HydnaPacket.HEADER_LENGTH;
+      var event:HydnaStreamEvent;
+      
+      if (dataStream == null) {
+        return;
+      }
+      
+/*      dataBuffer = new ByteArray();
+      
+      buffer.readBytes(dataBuffer, 0, dataLength);
+      event = new HydnaStreamEvent(HydnaStreamEvent.DATA, 0, tempBuffer);
+      dataStream.dispatchEvent(event);
+*/    }
     
   }
   

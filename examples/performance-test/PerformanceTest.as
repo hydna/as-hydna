@@ -39,8 +39,8 @@ package {
 
   import com.hydna.Hydna;
   import com.hydna.HydnaAddr;
-  import com.hydna.HydnaStream;
-  import com.hydna.HydnaStreamMode;
+  import com.hydna.HydnaDataStream;
+  import com.hydna.HydnaDataStreamMode;
   import com.hydna.HydnaStreamEvent;
   
   /**
@@ -64,7 +64,7 @@ package {
     public function PerformanceTest() {
       var output:TextField = new TextField();
       var hydna:Hydna;
-      var stream:HydnaStream;
+      var stream:HydnaDataStream;
       var starttime:Number;
       var messagesReceived:Number = 0;
       
@@ -76,7 +76,7 @@ package {
       hydna = Hydna.connect(HOST, PORT);
       
       stream = hydna.open(HydnaAddr.fromHex(ADDRESS), 
-                          HydnaStreamMode.READWRITE);
+                          HydnaDataStreamMode.READWRITE);
       
       stream.addEventListener(HydnaStreamEvent.OPEN, 
         function() : void {
@@ -97,6 +97,7 @@ package {
           if (++messagesReceived == MESSAGE_COUNT) {
             var time:Number = ((new Date()).getTime() - starttime); 
             output.appendText("Done in " + time + " milliseconds\n");
+/*            hydna.close();*/
           }
         }
       );
