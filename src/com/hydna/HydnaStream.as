@@ -127,8 +127,8 @@ package com.hydna {
      *  Closes the stream
      */
     public function close() : Boolean {
-      if (_connected == false || _closing == false) return false;
-      _closing = false;
+      if (_connected == false || _closing == true) return false;
+      _closing = true;
       return true;
     }
     

@@ -155,7 +155,6 @@ package com.hydna {
     
     override public function close() : Boolean {
       if (super.close()) {
-        
         if (socket.connected) {
           socket.writeShort(HydnaPacket.HEADER_LENGTH);
           socket.writeByte(HydnaPacket.CLOSE);
@@ -167,6 +166,7 @@ package com.hydna {
         }
         return true;
       }
+      
       return false;
     }
     

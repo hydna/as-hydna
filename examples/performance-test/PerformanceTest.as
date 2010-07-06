@@ -98,7 +98,7 @@ package {
           if (++messagesReceived == MESSAGE_COUNT) {
             var time:Number = ((new Date()).getTime() - starttime); 
             output.appendText("Done in " + time + " milliseconds\n");
-/*            hydna.close();*/
+            hydna.shutdown();
           }
         }
       );

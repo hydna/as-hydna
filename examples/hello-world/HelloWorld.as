@@ -101,6 +101,19 @@ package {
         function(event:HydnaStreamEvent) : void {
           var data:String = event.buffer.readUTF();
           output.appendText("Receivied '" + data + "' from network...\n\n");
+          hydna.shutdown();
+        }
+      );
+
+      stream.addEventListener(Event.CLOSE, 
+        function(event:Event) : void {
+          output.appendText("Stream is now closed\n");
+        }
+      );
+      
+      hydna.addEventListener(Event.CLOSE, 
+        function(event:Event) : void {
+          output.appendText("Hydna is now closed\n\n");
         }
       );
     }

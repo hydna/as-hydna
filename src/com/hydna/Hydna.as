@@ -190,11 +190,9 @@ package com.hydna {
     
     private function connectHandler(event:Event) : void {
       dispatchEvent(event);
-      trace("connectHandler: " + event);
     }
     
     private function closeHandler(event:Event) : void {
-      trace("closeHandler: " + event);
       if (_finalized || _shutdown) {
         dispatchEvent(event);
       } else {
@@ -247,7 +245,6 @@ package com.hydna {
           // Ignore packet
           trace("ignore packet, stream not found");
         } else {
-
           switch (packetFlag) {
 
             case HydnaPacket.OPENSTAT:
@@ -263,6 +260,8 @@ package com.hydna {
               break;
           }
         }
+
+        receiveBuffer.position = packetLength;
 
         if (receiveBuffer.length > packetLength) {
           var newSize:Number = receiveBuffer.length - packetLength;
@@ -338,7 +337,7 @@ package com.hydna {
       var dataLength:Number = packetLength - HydnaPacket.HEADER_LENGTH;
       var event:HydnaStreamEvent;
       var code:Number;
-      
+
       if (dataStream == null) {
         return;
       }
@@ -360,14 +359,12 @@ package com.hydna {
       
       function eventloop() : void {
         connectedStreams.pop();
-        
         if (connectedStreams.length == 0) {
           _finalized = true;
           if (socket.connected) {
             socket.close();
-          } else {
-            dispatchEvent(new Event(Event.CLOSE));
           }
+          dispatchEvent(new Event(Event.CLOSE));
         }
       }
       
@@ -375,19 +372,23 @@ package com.hydna {
         stream = HydnaStream(_streams[key]);
 
         if (stream != null && stream.connected) {
+          
           stream.addEventListener(Event.CLOSE, eventloop);
           connectedStreams.push(stream);
         }
 
       }
       
-      index = connectedStreams.length;
-      
-      while (index--) {
-        stream = HydnaStream(connectedStreams[index]);
-        stream.close();
-      }
+      if (connectedStreams.length == 0) {
+        eventloop();
+      } else {
+        index = connectedStreams.length;
 
+        while (index--) {
+          stream = HydnaStream(connectedStreams[index]);
+          stream.close();
+        }
+      }
     }
   }
   
