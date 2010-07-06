@@ -41,9 +41,10 @@ package com.hydna {
   import flash.utils.ByteArray;
   
   import com.hydna.HydnaStream;
+  import com.hydna.HydnaDataEvent;
   import com.hydna.HydnaDataStream;
-  import com.hydna.HydnaErrorEvent;
   import com.hydna.HydnaDataStreamMode;
+  import com.hydna.HydnaErrorEvent;
   
   public class Hydna extends EventDispatcher {
     
@@ -317,7 +318,7 @@ package com.hydna {
       var dataStream:HydnaDataStream = HydnaDataStream(stream);
       var dataLength:Number = packetLength - HydnaPacket.HEADER_LENGTH;
       var dataBuffer:ByteArray;
-      var event:HydnaStreamEvent;
+      var event:HydnaDataEvent;
       
       if (dataStream == null) {
         return;
@@ -326,7 +327,7 @@ package com.hydna {
       dataBuffer = new ByteArray();
       
       buffer.readBytes(dataBuffer, 0, dataLength);
-      event = new HydnaStreamEvent(HydnaStreamEvent.DATA, 0, dataBuffer);
+      event = new HydnaDataEvent(dataBuffer);
       dataStream.dispatchEvent(event);
     }
 
@@ -335,7 +336,6 @@ package com.hydna {
                                             packetLength:Number) : void {
       var dataStream:HydnaDataStream = HydnaDataStream(stream);
       var dataLength:Number = packetLength - HydnaPacket.HEADER_LENGTH;
-      var event:HydnaStreamEvent;
       var code:Number;
 
       if (dataStream == null) {

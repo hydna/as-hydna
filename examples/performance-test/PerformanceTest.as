@@ -42,7 +42,7 @@ package {
   import com.hydna.HydnaAddr;
   import com.hydna.HydnaDataStream;
   import com.hydna.HydnaDataStreamMode;
-  import com.hydna.HydnaStreamEvent;
+  import com.hydna.HydnaDataEvent;
   
   /**
    *  Hydna Actionscript Performance Test 
@@ -93,8 +93,8 @@ package {
         }
       );
 
-      stream.addEventListener(HydnaStreamEvent.DATA, 
-        function(event:HydnaStreamEvent) : void {
+      stream.addEventListener(HydnaDataEvent.DATA, 
+        function(event:HydnaDataEvent) : void {
           if (++messagesReceived == MESSAGE_COUNT) {
             var time:Number = ((new Date()).getTime() - starttime); 
             output.appendText("Done in " + time + " milliseconds\n");

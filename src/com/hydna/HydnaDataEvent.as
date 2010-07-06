@@ -1,4 +1,4 @@
-// HydnaStreamEvent.as
+// HydnaDataEvent.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -37,32 +37,22 @@ package com.hydna {
   
   import com.hydna.HydnaAddr;
 
-  public class HydnaStreamEvent extends Event {
+  public class HydnaDataEvent extends Event {
     
     public static const DATA:String = "data";
     
-    private var _code:Number = 0;
-    private var _buffer:ByteArray;
+    private var _data:ByteArray;
     
-    public function HydnaStreamEvent(type:String, 
-                                     code:Number=0, 
-                                     buffer:ByteArray=null) {
-      super(type, false, false);
-      _code = code;
-      _buffer = buffer;
-    }
-    
-    public function get buffer() : ByteArray {
-      return _buffer;
+    public function HydnaDataEvent(data:ByteArray) {
+      super(DATA, false, false);
+      _data = data;
     }
     
     /**
-     *  Returns the HydnaAddr for the HydnaStream that raised this Event.
-     *
-     *  @return {HydnaAddr} the specified HydnaAddr instance.
+     *  Returns the data associated with this HydnaDataEvent instance.
      */
-    public function get code() : Number {
-      return _code;
+    public function get data() : ByteArray {
+      return _data;
     }
     
   }

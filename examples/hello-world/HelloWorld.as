@@ -44,7 +44,7 @@ package {
   import com.hydna.HydnaAddr;
   import com.hydna.HydnaDataStream;
   import com.hydna.HydnaDataStreamMode;
-  import com.hydna.HydnaStreamEvent;
+  import com.hydna.HydnaDataEvent;
   
   /**
    *  Hello world example Application
@@ -97,9 +97,9 @@ package {
         }
       );
 
-      stream.addEventListener(HydnaStreamEvent.DATA, 
-        function(event:HydnaStreamEvent) : void {
-          var data:String = event.buffer.readUTF();
+      stream.addEventListener(HydnaDataEvent.DATA, 
+        function(event:HydnaDataEvent) : void {
+          var data:String = event.data.readUTF();
           output.appendText("Receivied '" + data + "' from network...\n\n");
           hydna.shutdown();
         }

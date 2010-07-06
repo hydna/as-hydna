@@ -39,7 +39,6 @@ package com.hydna {
   
   import com.hydna.HydnaAddr;
   import com.hydna.HydnaStream;
-  import com.hydna.HydnaStreamEvent;
   import com.hydna.HydnaDataStreamMode;
   import com.hydna.HydnaStreamType;
   import com.hydna.HydnaPacket;

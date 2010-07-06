@@ -38,7 +38,6 @@ package com.hydna {
   import flash.utils.ByteArray;
   
   import com.hydna.HydnaAddr;
-  import com.hydna.HydnaStreamEvent;
   import com.hydna.HydnaPacket;
 
   public class HydnaStream extends EventDispatcher {
