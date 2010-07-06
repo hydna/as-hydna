@@ -48,6 +48,7 @@ package com.hydna {
     private var _originalAddr:HydnaAddr = null;
     private var _socket:Socket = null;
     private var _connected:Boolean = false;
+    private var _closing:Boolean = false;
     
     /**
      * Initializes a new HydnaStream instance
@@ -73,6 +74,13 @@ package com.hydna {
      */
     public function get connected() : Boolean {
       return _connected;
+    }
+
+    /**
+     *  Return the closing state for this HydnaStream instance.
+     */
+    public function get closing() : Boolean {
+      return _closing;
     }
 
     /**
@@ -115,16 +123,17 @@ package com.hydna {
       return _originalAddr;
     }
     
-    public function close() : void {
-      internalClose();
+    /**
+     *  Closes the stream
+     */
+    public function close() : Boolean {
+      if (_connected == false || _closing == false) return false;
+      _closing = false;
+      return true;
     }
     
     internal function internalClose(error:Number=0) : void {
-      if (_connected) {
-        var event:HydnaStreamEvent = new HydnaStreamEvent(HydnaStreamEvent.CLOSE);
-        _connected = false;
-        dispatchEvent(event);
-      }
+      throw new Error("Not Implemented");
     }
     
   }

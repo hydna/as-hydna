@@ -34,6 +34,7 @@
 package {
 
   import flash.display.Sprite;
+  import flash.events.Event;
   import flash.events.MouseEvent;
   import flash.text.TextField;
   import flash.text.TextFieldAutoSize;
@@ -89,7 +90,7 @@ package {
       stream = hydna.open(HydnaAddr.fromHex(ADDRESS), 
                           HydnaDataStreamMode.READWRITE);
       
-      stream.addEventListener(HydnaStreamEvent.OPEN, 
+      stream.addEventListener(Event.OPEN, 
         function() : void {
           output.appendText("Connected with Hydna Network\n");
           send.visible = true;

@@ -79,6 +79,16 @@ package com.hydna {
     }
     
     /**
+     *  Compares this HydnaAddr instance with another one.
+     *
+     *  @return {Boolean} true if the two instances match, else false.
+     */
+    public function equals(addr:HydnaAddr) : Boolean {
+      if (addr == null) return false;
+      return chars == addr.chars;
+    }
+    
+    /**
      *  Converts this HydnaAddr into the hex
      *
      *  @param {String} delimiter The delimiter to use between keypairs. 

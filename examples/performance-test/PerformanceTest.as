@@ -34,6 +34,7 @@
 package {
   
   import flash.display.Sprite;
+  import flash.events.Event;
   import flash.text.TextField;
   import flash.utils.ByteArray;
 
@@ -78,7 +79,7 @@ package {
       stream = hydna.open(HydnaAddr.fromHex(ADDRESS), 
                           HydnaDataStreamMode.READWRITE);
       
-      stream.addEventListener(HydnaStreamEvent.OPEN, 
+      stream.addEventListener(Event.OPEN, 
         function() : void {
           
           output.appendText("Sending " + MESSAGE_COUNT + " messages ("

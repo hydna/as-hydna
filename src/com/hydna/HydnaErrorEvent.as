@@ -61,7 +61,7 @@ package com.hydna {
      *  @return {String} error message.
      */
     public function get message() : String {
-      return _buffer;
+      return _message;
     }
     
     /**

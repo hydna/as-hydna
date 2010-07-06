@@ -39,10 +39,7 @@ package com.hydna {
 
   public class HydnaStreamEvent extends Event {
     
-    public static const OPEN:String = "open";
-    public static const CLOSE:String = "close";
     public static const DATA:String = "data";
-    public static const ERROR:String = "error";
     
     private var _code:Number = 0;
     private var _buffer:ByteArray;

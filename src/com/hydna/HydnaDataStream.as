@@ -153,6 +153,29 @@ package com.hydna {
       }
     }
     
+    override public function close() : Boolean {
+      if (super.close()) {
+        
+        if (socket.connected) {
+          socket.writeShort(HydnaPacket.HEADER_LENGTH);
+          socket.writeByte(HydnaPacket.CLOSE);
+          socket.writeByte(0);
+          socket.writeBytes(addr.bytes, 0, addr.bytes.length);
+          socket.flush();
+        } else {
+          internalClose(0);
+        }
+        return true;
+      }
+      return false;
+    }
+    
+    override internal function internalClose(error:Number=0) : void {
+      setConnected(false);
+      var event:Event = new Event(Event.CLOSE);
+      dispatchEvent(event);
+    }
+    
   }
   
 }

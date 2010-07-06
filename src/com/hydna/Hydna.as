@@ -42,6 +42,7 @@ package com.hydna {
   
   import com.hydna.HydnaStream;
   import com.hydna.HydnaDataStream;
+  import com.hydna.HydnaErrorEvent;
   import com.hydna.HydnaDataStreamMode;
   
   public class Hydna extends EventDispatcher {
@@ -54,6 +55,8 @@ package com.hydna {
     
     private var _socket:Socket = null;
     private var _streams:Object = new Object();
+    private var _finalized:Boolean = false;
+    private var _shutdown:Boolean = false;
 
     private var receiveBuffer:ByteArray = new ByteArray();
     
@@ -67,8 +70,8 @@ package com.hydna {
      *                       use default port.
      *  @return {com.hydna.Hydna} the newly created Hydna instance.
      */
-    public static function connect(host:String = null, 
-                                   port:uint = 0) : Hydna {
+    public static function connect(host:String = DEFAULT_HOST, 
+                                   port:uint = DEFAULT_PORT) : Hydna {
       return new Hydna(host, port);
     }
     
@@ -124,6 +127,8 @@ package com.hydna {
       }
       
       stream = new HydnaDataStream(_socket, addr, mode, token);
+      stream.addEventListener(Event.OPEN, streamOpenHandler);
+      stream.addEventListener(Event.CLOSE, streamCloseHandler);
       
       _streams[addrValue] = stream;
       
@@ -133,12 +138,54 @@ package com.hydna {
     }
     
     /**
+     *  Closes connection to the Hydna Network.
      *
      *  @param {Boolean} graceful Closes each individual stream before 
      *                            final shutdown.
      */
-    public function shutdown(graceful:Boolean = false) {
+    public function shutdown(graceful:Boolean = true) : void {
+      var stream:HydnaStream;
       
+      if (_shutdown) return;
+      
+      if (graceful) {
+        finalize();
+      } else {
+        
+        for (var key:String in _streams) {
+          stream = HydnaStream(_streams[key]);
+
+          if (stream != null && stream.connected) {
+            stream.removeEventListener(Event.OPEN, streamOpenHandler);
+            stream.removeEventListener(Event.CLOSE, streamCloseHandler);
+          }
+        }
+        
+        _streams = new Object();
+        _shutdown = true;
+        
+        if (_socket.connected) {
+          _socket.close();
+        }
+      }
+    }
+
+    private function streamOpenHandler(event:Event) : void {
+      var stream:HydnaDataStream = HydnaDataStream(event.target);
+      
+      if (stream.addr.equals(stream.originalAddr) == false) {
+        delete _streams[stream.originalAddr.chars];
+        _streams[stream.addr] = stream;
+      }
+    }
+    
+    private function streamCloseHandler(event:Event) : void {
+      var stream:HydnaStream = HydnaStream(event.target);
+
+      delete _streams[stream.addr.chars];
+      
+      stream.removeEventListener(Event.OPEN, streamOpenHandler);
+      stream.removeEventListener(Event.CLOSE, streamCloseHandler);
     }
     
     private function connectHandler(event:Event) : void {
@@ -147,8 +194,12 @@ package com.hydna {
     }
     
     private function closeHandler(event:Event) : void {
-      dispatchEvent(event);
       trace("closeHandler: " + event);
+      if (_finalized || _shutdown) {
+        dispatchEvent(event);
+      } else {
+        finalize();
+      }
     }
 
     private function ioErrorHandler(event:IOErrorEvent) : void {
@@ -233,7 +284,7 @@ package com.hydna {
       var index:Number = 8;
       var responseAddr:String = "";
       var code:Number;
-      var event:HydnaStreamEvent;
+      var event:Event;
 
       if (dataStream == null) {
         return;
@@ -253,9 +304,9 @@ package com.hydna {
       if (code == 0) {
         dataStream.setConnected(true);
         dataStream.setAddr(HydnaAddr.fromChars(responseAddr));
-        event = new HydnaStreamEvent(HydnaStreamEvent.OPEN);
+        event = new Event(Event.OPEN);
       } else {
-        event = new HydnaStreamEvent(HydnaStreamEvent.ERROR, code);
+        event = new HydnaErrorEvent(code);
       }
       
       dataStream.dispatchEvent(event);
@@ -286,18 +337,58 @@ package com.hydna {
       var dataStream:HydnaDataStream = HydnaDataStream(stream);
       var dataLength:Number = packetLength - HydnaPacket.HEADER_LENGTH;
       var event:HydnaStreamEvent;
+      var code:Number;
       
       if (dataStream == null) {
         return;
       }
+
+      if (dataLength < 2) {
+        // Ignore packet, invalid format
+        return;
+      }
       
-/*      dataBuffer = new ByteArray();
+      code = buffer.readUnsignedShort();
+      dataStream.internalClose(code);
+    }
+
+    private function finalize() : void {
+      var socket:Socket = _socket;
+      var connectedStreams:Array = new Array();
+      var stream:HydnaStream;
+      var index:Number;
       
-      buffer.readBytes(dataBuffer, 0, dataLength);
-      event = new HydnaStreamEvent(HydnaStreamEvent.DATA, 0, tempBuffer);
-      dataStream.dispatchEvent(event);
-*/    }
-    
+      function eventloop() : void {
+        connectedStreams.pop();
+        
+        if (connectedStreams.length == 0) {
+          _finalized = true;
+          if (socket.connected) {
+            socket.close();
+          } else {
+            dispatchEvent(new Event(Event.CLOSE));
+          }
+        }
+      }
+      
+      for (var key:String in _streams) {
+        stream = HydnaStream(_streams[key]);
+
+        if (stream != null && stream.connected) {
+          stream.addEventListener(Event.CLOSE, eventloop);
+          connectedStreams.push(stream);
+        }
+
+      }
+      
+      index = connectedStreams.length;
+      
+      while (index--) {
+        stream = HydnaStream(connectedStreams[index]);
+        stream.close();
+      }
+
+    }
   }
   
 }
