@@ -55,7 +55,7 @@ package {
     public static const HOST:String = "127.0.0.1";
     public static const PORT:Number = 7015;
     
-    public static const ADDRESS:String = "AABBCCDD:EEFF:2255";
+    public static const ADDRESS:String = "0000:0000:AABB:CCDD:0000:0000:EEFF:2255";
     
     public function HelloWorld() {
       var output:TextField = new TextField();

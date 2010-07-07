@@ -79,7 +79,7 @@ package com.hydna {
         throw new Error("Stream is not writable");
       }
       
-      socket.writeShort(data.length + HydnaPacket.HEADER_LENGTH);
+      socket.writeShort(data.length + HydnaPacket.HEADER_SIZE);
       socket.writeByte(HydnaPacket.EMIT);
       socket.writeByte(0);
       socket.writeBytes(addr.bytes, 0, addr.bytes.length);
@@ -106,7 +106,7 @@ package com.hydna {
      */
     internal function open() : void {
       var token:String = this._token;
-      var packetLength:Number = 13;
+      var packetLength:Number = HydnaPacket.HEADER_SIZE + 1;
       var tokenBuffer:ByteArray = null;
       var mode:Number = 0;
       
@@ -125,9 +125,12 @@ package com.hydna {
       }
       
       function postOpen() : void {
+        tokenBuffer = new ByteArray();
 
-        if (token !== null) {
-          tokenBuffer = new ByteArray();
+        if (token == null) {
+          tokenBuffer.writeByte(0);
+          packetLength += 1;
+        } else {
           tokenBuffer.writeUTF(token);
           packetLength += tokenBuffer.length;
         }
@@ -137,10 +140,7 @@ package com.hydna {
         socket.writeByte(0);
         socket.writeBytes(addr.bytes, 0, addr.bytes.length);
         socket.writeByte(mode);
-
-        if (tokenBuffer) {
-          socket.writeBytes(tokenBuffer, 0, tokenBuffer.length);
-        }
+        socket.writeBytes(tokenBuffer, 0, tokenBuffer.length);
         
         socket.flush();
       }
@@ -155,7 +155,7 @@ package com.hydna {
     override public function close() : Boolean {
       if (super.close()) {
         if (socket.connected) {
-          socket.writeShort(HydnaPacket.HEADER_LENGTH);
+          socket.writeShort(HydnaPacket.HEADER_SIZE);
           socket.writeByte(HydnaPacket.CLOSE);
           socket.writeByte(0);
           socket.writeBytes(addr.bytes, 0, addr.bytes.length);

@@ -43,6 +43,8 @@ package com.hydna {
     public static var PAD_LEFT:String = "LEFT";
     public static var PAD_RIGHT:String = "RIGHT";
     
+    public static const SIZE:Number = 16;
+    
     private var _bytes:ByteArray;
     private var _chars:String;
     
@@ -96,7 +98,7 @@ package com.hydna {
      */
     public function toHex(delimiter:String = ":") : String {
       var result:Array = [];
-      var index:Number = 4;
+      var index:Number = SIZE / 2;
 
       _bytes.position = 0;
 
@@ -130,8 +132,8 @@ package com.hydna {
     public static function fromChars(buffer:String) : HydnaAddr {
       var bytes:ByteArray = new ByteArray();
       
-      if (buffer == null || buffer.length != 8) {
-        throw new Error("buffer must be exactly 8 chars.")
+      if (buffer == null || buffer.length != SIZE) {
+        throw new Error("buffer must be exactly " + SIZE + " chars.")
       }
       
       for (var i:Number = 0; i < buffer.length; i++) {
@@ -147,11 +149,11 @@ package com.hydna {
       *  @param {String} buffer The ByteArray that represents the address.
       */
     public static function fromByteArray(buffer:ByteArray) : HydnaAddr {
-      var index:Number = 8;
+      var index:Number = SIZE;
       var chars:Array = new Array();
       
-      if (buffer == null || buffer.length != 8) {
-        throw new Error("Expected a size 8 ByteArray instance");
+      if (buffer == null || buffer.length != SIZE) {
+        throw new Error("Expected a size " + SIZE + " ByteArray instance");
       }
       
       buffer.position = 0;
@@ -184,13 +186,13 @@ package com.hydna {
         throw new Error('Unknown padding method: ' + padding);
       }
 
-      if (hex.length > 16) {
-        // Key is larger then 16 chars
+      if (hex.length > SIZE * 2) {
+        // Key is larger then 32 chars
         return null;
       }
 
       if (padding != PAD_NONE) {
-        while (hex.length < 16) {
+        while (hex.length < SIZE * 2) {
           hex = padding == PAD_LEFT ? '0' + hex : hex + '0';
         }
       } else if (hex.length < expectedLength) {
@@ -212,7 +214,7 @@ package com.hydna {
     internal static function getNullAddr() : HydnaAddr {
       var nulls:ByteArray = new ByteArray();
       
-      for (var i:Number = 0; i < 8; i++) {
+      for (var i:Number = 0; i < SIZE; i++) {
         nulls.writeByte(0);
       }
       

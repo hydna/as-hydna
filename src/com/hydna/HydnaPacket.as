@@ -38,7 +38,7 @@ package com.hydna {
    */
   public class HydnaPacket {
     
-    public static const HEADER_LENGTH:Number = 12;
+    public static const HEADER_SIZE:Number = 20;
     
     public static const PING:Number      = 0x01;
     
@@ -50,7 +50,12 @@ package com.hydna {
     public static const DATA:Number      = 0x08;
     public static const INTERRUPT:Number = 0x09;
 
+    public static const SUCCESS:Number = 0;
 
+    public static const ADDR_SIZE:Number = 16;
+
+    public static const OPENSTAT_PACKET_SIZE:Number = 17;
+    public static const INTERRUPT_PACKET_SIZE:Number = 2;
   }
 
 

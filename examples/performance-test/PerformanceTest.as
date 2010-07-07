@@ -57,10 +57,10 @@ package {
     public static const HOST:String = "127.0.0.1";
     public static const PORT:Number = 7015;
     
-    public static const ADDRESS:String = "AABBCCDD:EEFF:2255";
+    public static const ADDRESS:String = "0000:0000:AABB:CCDD:0000:0000:EEFF:2255";
     
     public static const MESSAGE_COUNT:Number = 100000;
-    public static const MESSAGE:String = "This is a performance test";
+    public static const MESSAGE:String = "This is a performance test!";
     
     public function PerformanceTest() {
       var output:TextField = new TextField();

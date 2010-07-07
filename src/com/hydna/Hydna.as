@@ -44,6 +44,7 @@ package com.hydna {
   import com.hydna.HydnaDataEvent;
   import com.hydna.HydnaDataStream;
   import com.hydna.HydnaDataStreamMode;
+  import com.hydna.HydnaPacket;
   import com.hydna.HydnaErrorEvent;
   
   public class Hydna extends EventDispatcher {
@@ -221,11 +222,11 @@ package com.hydna {
                         receiveBuffer.length, 
                         _socket.bytesAvailable);
       
-      while (receiveBuffer.length > HydnaPacket.HEADER_LENGTH) {
+      while (receiveBuffer.length > HydnaPacket.HEADER_SIZE) {
 
         receiveBuffer.position = 0;
         packetAddr = "";
-        index = 8;
+        index = HydnaAddr.SIZE;
                 
         packetLength = receiveBuffer.readUnsignedShort();
 
@@ -280,8 +281,8 @@ package com.hydna {
                                            buffer:ByteArray,
                                            packetLength:Number) : void {
       var dataStream:HydnaDataStream = HydnaDataStream(stream);
-      var dataLength:Number = packetLength - HydnaPacket.HEADER_LENGTH;
-      var index:Number = 8;
+      var dataLength:Number = packetLength - HydnaPacket.HEADER_SIZE;
+      var index:Number = HydnaAddr.SIZE;
       var responseAddr:String = "";
       var code:Number;
       var event:Event;
@@ -290,7 +291,7 @@ package com.hydna {
         return;
       }
       
-      if (dataLength < 9) {
+      if (dataLength < HydnaPacket.OPENSTAT_PACKET_SIZE) {
         // Ignore packet, invalid format
         return;
       }
@@ -301,7 +302,7 @@ package com.hydna {
         responseAddr += String.fromCharCode(buffer.readUnsignedByte());
       }
       
-      if (code == 0) {
+      if (code == HydnaPacket.SUCCESS) {
         dataStream.setConnected(true);
         dataStream.setAddr(HydnaAddr.fromChars(responseAddr));
         event = new Event(Event.OPEN);
@@ -316,7 +317,7 @@ package com.hydna {
                                        buffer:ByteArray,
                                        packetLength:Number) : void {
       var dataStream:HydnaDataStream = HydnaDataStream(stream);
-      var dataLength:Number = packetLength - HydnaPacket.HEADER_LENGTH;
+      var dataLength:Number = packetLength - HydnaPacket.HEADER_SIZE;
       var dataBuffer:ByteArray;
       var event:HydnaDataEvent;
       
@@ -335,14 +336,14 @@ package com.hydna {
                                             buffer:ByteArray,
                                             packetLength:Number) : void {
       var dataStream:HydnaDataStream = HydnaDataStream(stream);
-      var dataLength:Number = packetLength - HydnaPacket.HEADER_LENGTH;
+      var dataLength:Number = packetLength - HydnaPacket.HEADER_SIZE;
       var code:Number;
 
       if (dataStream == null) {
         return;
       }
 
-      if (dataLength < 2) {
+      if (dataLength < HydnaPacket.INTERRUPT_PACKET_SIZE) {
         // Ignore packet, invalid format
         return;
       }
