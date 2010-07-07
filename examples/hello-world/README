@@ -1,0 +1,3 @@
+BUILD
+=====
+~/Downloads/flex_sdk_4.1.0.16076/bin/mxmlc examples/hello-world/HelloWorld.as -o bin/hello-world.swf -sp src
