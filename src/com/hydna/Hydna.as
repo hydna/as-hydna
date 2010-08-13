@@ -177,7 +177,7 @@ package com.hydna {
       
       if (stream.addr.equals(stream.originalAddr) == false) {
         delete _streams[stream.originalAddr.chars];
-        _streams[stream.addr] = stream;
+        _streams[stream.addr.chars] = stream;
       }
     }
     
