@@ -53,10 +53,8 @@ package com.hydna {
      * Initializes a new HydnaStream instance
      */
     public function HydnaStream(type:String,
-                                socket:Socket, 
                                 addr:HydnaAddr) {
       _type = type;
-      _socket = socket;
       _addr = addr;
       _originalAddr = addr;
     }
@@ -89,6 +87,30 @@ package com.hydna {
       _connected = value;
     }
     
+    /**
+     *  Return the connected state for this HydnaStream instance.
+     */
+    internal function setSocket(streamSocket:Socket) : void {
+      
+      if (_socket != null) {
+        _socket.removeEventListener(Event.CONNECT, internalConnect);
+      }
+      
+      _socket = streamSocket;
+      
+      if (_socket == null) {
+        return;
+      }
+      
+      // Check if socket already is connect, if so, fire internalConnect else
+      // wait for a connection.
+      if (_socket.connected) {
+        internalConnect();
+      } else {
+        _socket.addEventListener(Event.CONNECT, internalConnect);
+      }
+    }
+
     /**
      *  Returns the type of this HydnaStream instance. Valid values are:
      *  HydnaStreamType.DATA, HydnaStreamType.PING and HydnaStreamType.META.
@@ -130,6 +152,8 @@ package com.hydna {
       _closing = true;
       return true;
     }
+    
+    internal function internalConnect() : void { }
     
     internal function internalClose(error:Number=0) : void {
       throw new Error("Not Implemented");

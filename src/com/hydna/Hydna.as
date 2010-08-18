@@ -39,6 +39,7 @@ package com.hydna {
   import flash.events.SecurityErrorEvent;
   import flash.net.Socket;
   import flash.utils.ByteArray;
+  import flash.utils.Timer;
   
   import com.hydna.HydnaStream;
   import com.hydna.HydnaDataEvent;
@@ -55,12 +56,22 @@ package com.hydna {
     public static const DEFAULT_HOST:String = "127.0.0.1";
     public static const DEFAULT_PORT:Number = 7015;
     
+    public static const DEFAULT_RECONNECT_INTERVAL:Number = 1000;
+    public static const DEFAULT_MAX_CONNECT_ATTEMPTS:Number = 0;
+    
     private var _socket:Socket = null;
     private var _streams:Object = new Object();
     private var _finalized:Boolean = false;
     private var _shutdown:Boolean = false;
-
+    
+    private var _host:String;
+    private var _port:uint;
+    
     private var receiveBuffer:ByteArray = new ByteArray();
+    
+    private var _connected:Boolean;
+    
+    private var _reconnectTimer:Timer;
     
     /**
      *  Creates a Hydna object. If no parameters are specified, the default
@@ -78,7 +89,7 @@ package com.hydna {
     }
     
     /**
-     *  Creates a Hydna object. 
+     *  Creates a Hydna Context object. 
      *
      *  @param {String} host The name of the host to connect to. 
      *  @param {Number} port The port number to connect to. 
@@ -86,14 +97,19 @@ package com.hydna {
     public function Hydna(host:String, port:uint) {
       super();
 
-      _socket = new Socket(host, port);
+      _host = host;
+      _port = port;
       
-      _socket.addEventListener(Event.CLOSE, closeHandler);
-      _socket.addEventListener(Event.CONNECT, connectHandler);
-      _socket.addEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
-      _socket.addEventListener(ProgressEvent.SOCKET_DATA, receive);
-      _socket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, 
-                               securityErrorHandler);
+      _reconnectTimer = new Timer(DEFAULT_RECONNECT_INTERVAL,
+                                  DEFAULT_MAX_CONNECT_ATTEMPTS);
+      
+      _reconnectTimer.addEventListener("timer", reconnectTimerHandler);
+      _reconnectTimer.addEventListener("timerComplete", 
+                                       reconnectTimerCompleteHandler);
+      
+      connectInternal();
+      
+      _connected = true;
     }
     
     /**
@@ -102,7 +118,35 @@ package com.hydna {
      *  otherwise.
      */
     public function get connected() : Boolean {
-      return _socket.connected;
+      return _connected;
+    }
+
+    /**
+     *
+     */
+    public function get reconnectInterval() : Number {
+      return _reconnectTimer.delay;
+    }
+
+    /**
+     *
+     */
+    public function set reconnectInterval(value:Number) : void {
+      _reconnectTimer.delay = value;
+    }
+
+    /**
+     *
+     */
+    public function get maxConnectAttempts() : Number {
+      return _reconnectTimer.repeatCount;
+    }
+
+    /**
+     *
+     */
+    public function set maxConnectAttempts(value:Number) : void {
+      _reconnectTimer.repeatCount = value;
     }
     
     /**
@@ -128,13 +172,15 @@ package com.hydna {
         return _streams[addrValue];
       }
       
-      stream = new HydnaDataStream(_socket, addr, mode, token);
+      stream = new HydnaDataStream(addr, mode, token);
       stream.addEventListener(Event.OPEN, streamOpenHandler);
       stream.addEventListener(Event.CLOSE, streamCloseHandler);
       
       _streams[addrValue] = stream;
       
-      stream.open();
+      if (_socket != null && _socket.connected) {
+        stream.setSocket(_socket);
+      }
       
       return stream;
     }
@@ -166,12 +212,23 @@ package com.hydna {
         _streams = new Object();
         _shutdown = true;
         
-        if (_socket.connected) {
-          _socket.close();
-        }
+        
+        destroyCurrentSocket();
       }
     }
-
+    
+    private function connectInternal() : void {
+      _socket = new Socket(_host, _port);
+      
+      _socket.addEventListener(Event.CLOSE, closeHandler);
+      _socket.addEventListener(Event.CONNECT, connectHandler);
+      _socket.addEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
+      _socket.addEventListener(ProgressEvent.SOCKET_DATA, receive);
+      _socket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, 
+                               securityErrorHandler);
+      
+    }
+    
     private function streamOpenHandler(event:Event) : void {
       var stream:HydnaDataStream = HydnaDataStream(event.target);
       
@@ -191,15 +248,44 @@ package com.hydna {
     }
     
     private function connectHandler(event:Event) : void {
-      dispatchEvent(event);
+      var stream:HydnaStream;
+      
+      // Set socket for all openened (non-closing) streams.
+      for (var key:String in _streams) {
+        stream = HydnaStream(_streams[key]);
+        
+        if (!stream.closing) {
+          stream.setSocket(_socket);
+        }
+      }
+      
+      _reconnectTimer.reset();
+      
+      // Only fire the connect event first time connected.
+      if (_connected == false) {
+        dispatchEvent(event);
+      }
     }
     
     private function closeHandler(event:Event) : void {
-      if (_finalized || _shutdown) {
-        dispatchEvent(event);
-      } else {
-        finalize();
+      var stream:HydnaStream;
+
+      trace("closed by server");
+      
+      destroyCurrentSocket();
+      
+      if (_shutdown) {
+        return;
       }
+
+      // Set socket to null for all openened (including non-closing) 
+      // streams.
+      for (var key:String in _streams) {
+        stream = HydnaStream(_streams[key]);
+        stream.setSocket(null);
+      }
+      
+      _reconnectTimer.start();
     }
 
     private function ioErrorHandler(event:IOErrorEvent) : void {
@@ -208,6 +294,21 @@ package com.hydna {
 
     private function securityErrorHandler(event:SecurityErrorEvent) : void {
       trace("securityErrorHandler: " + event);
+      trace("here");
+      _reconnectTimer.start();
+      
+    }
+    
+    private function reconnectTimerHandler(event:Event) : void {
+      _reconnectTimer.stop();
+      if (!_shutdown) {
+        trace("reconnectToServer");
+        connectInternal();
+      }
+    }
+
+    private function reconnectTimerCompleteHandler(event:Event) : void {
+      finalize();
     }
 
     private function receive(event:ProgressEvent) : void {
@@ -303,14 +404,17 @@ package com.hydna {
       }
       
       if (code == HydnaPacket.SUCCESS) {
-        dataStream.setConnected(true);
         dataStream.setAddr(HydnaAddr.fromChars(responseAddr));
-        event = new Event(Event.OPEN);
+        if (!dataStream.connected) {
+          dataStream.setConnected(true);
+          event = new Event(Event.OPEN);
+          dataStream.dispatchEvent(event);
+        }
       } else {
         event = new HydnaErrorEvent(code);
+        dataStream.dispatchEvent(event);
       }
       
-      dataStream.dispatchEvent(event);
     }
     
     private function processDataPacket(stream:HydnaStream,
@@ -362,7 +466,8 @@ package com.hydna {
         connectedStreams.pop();
         if (connectedStreams.length == 0) {
           _finalized = true;
-          if (socket.connected) {
+          _connected = false;
+          if (socket && socket.connected) {
             socket.close();
           }
           dispatchEvent(new Event(Event.CLOSE));
@@ -391,6 +496,27 @@ package com.hydna {
         }
       }
     }
+    
+    private function destroyCurrentSocket() : void {
+      
+      if (_socket == null) {
+        return;
+      }
+
+      _socket.removeEventListener(Event.CLOSE, closeHandler);
+      _socket.removeEventListener(Event.CONNECT, connectHandler);
+      _socket.removeEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
+      _socket.removeEventListener(ProgressEvent.SOCKET_DATA, receive);
+      _socket.removeEventListener(SecurityErrorEvent.SECURITY_ERROR, 
+                                  securityErrorHandler);
+                              
+      if (_socket.connected) {
+        _socket.close();
+      }
+      
+      _socket = null;
+    }
+    
   }
   
 }

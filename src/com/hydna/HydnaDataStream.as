@@ -34,6 +34,7 @@ package com.hydna {
   
   import flash.events.Event;
   import flash.events.EventDispatcher;
+  import flash.events.IOErrorEvent;
   import flash.net.Socket;
   import flash.utils.ByteArray;
   
@@ -45,19 +46,25 @@ package com.hydna {
 
   public class HydnaDataStream extends HydnaStream {
     
+    public static const MESSAGE_QUEUE_MAX:Number = 10000;
+    
     private var _mode:String = null;
     private var _token:String = null;
+    
+    private var _messageQueue:Array;
+    private var _messageQueueMax:Number;
     
     /**
      * Initializes a new HydnaStream instance
      */
-    public function HydnaDataStream(socket:Socket, 
-                                  addr:HydnaAddr, 
-                                  mode:String,
-                                  token:String) {
-      super(HydnaStreamType.DATA, socket, addr);
+    public function HydnaDataStream(addr:HydnaAddr, 
+                                    mode:String,
+                                    token:String) {
+      super(HydnaStreamType.DATA, addr);
       _mode = mode;
       _token = token;
+      _messageQueue = new Array();
+      _messageQueueMax = MESSAGE_QUEUE_MAX;
     }
 
     /**
@@ -69,22 +76,64 @@ package com.hydna {
       return _mode;
     }
     
+    public function get messageQueueMax() : Number {
+      return _messageQueueMax;
+    }
+
+    public function set messageQueueMax(value:Number) : void {
+      _messageQueueMax = value;
+    }
+    
     public function write(data:ByteArray) : void {
-      
-      if (connected == false) {
-        throw new Error("Stream is not connected.");
-      }
+      var message:ByteArray;
 
       if (_mode == HydnaDataStreamMode.READ) {
         throw new Error("Stream is not writable");
       }
       
-      socket.writeShort(data.length + HydnaPacket.HEADER_SIZE);
-      socket.writeByte(HydnaPacket.EMIT);
-      socket.writeByte(0);
-      socket.writeBytes(addr.bytes, 0, addr.bytes.length);
-      socket.writeBytes(data, 0, data.length);
-      socket.flush();
+      if (connected == false) {
+        throw new Error("Stream is not connected.");
+      }
+      
+      message = new ByteArray();
+      message.writeShort(data.length + HydnaPacket.HEADER_SIZE);
+      message.writeByte(HydnaPacket.EMIT);
+      message.writeByte(0);
+      message.writeBytes(addr.bytes, 0, addr.bytes.length);
+      message.writeBytes(data, 0, data.length);
+
+      // Try to send the message to server. The message is queued 
+      // on failure.
+      if (postMessage(message) == false) {
+
+        // Check if queue is full. If so, remove the last message 
+        // (hopefully) less important.
+        if (_messageQueue.length == _messageQueueMax) {
+          _messageQueue.pop();
+        }
+        
+        _messageQueue.push(message);
+      }
+    }
+    
+    /**
+     * Post message to underlying socket. Returns true on success else false.
+     */
+    private function postMessage(message:ByteArray) : Boolean {
+      if (socket == null) {
+        return false;
+      }
+      
+      try {
+        socket.writeBytes(message, 0, message.length);
+        socket.flush();
+      } catch (error:IOErrorEvent) {
+        // Something wen't terrible wrong. Queue message and wait 
+        // for a reconnect.
+        return false;
+      }
+      
+      return true;
     }
     
     /**
@@ -101,15 +150,17 @@ package com.hydna {
     }
     
     /**
-     *  Internal method. Sends an open request from stream address.
-     * 
+     * Handles socket connect events. Send the OPEN control packet to 
+     * Hydna network.
      */
-    internal function open() : void {
+    override internal function internalConnect() : void {
+      super.internalConnect();
       var token:String = this._token;
       var packetLength:Number = HydnaPacket.HEADER_SIZE + 1;
-      var tokenBuffer:ByteArray = null;
+      var tokenBuffer:ByteArray;
+      var message:ByteArray;
       var mode:Number = 0;
-      
+
       switch (this._mode) {
         case HydnaDataStreamMode.READ: 
           mode = 1;
@@ -123,43 +174,66 @@ package com.hydna {
           mode = 3;
           break;
       }
-      
-      function postOpen() : void {
-        tokenBuffer = new ByteArray();
 
-        if (token == null) {
-          tokenBuffer.writeByte(0);
-          packetLength += 1;
-        } else {
-          tokenBuffer.writeUTF(token);
-          packetLength += tokenBuffer.length;
-        }
+      tokenBuffer = new ByteArray();
 
-        socket.writeShort(packetLength);
-        socket.writeByte(HydnaPacket.OPEN);
-        socket.writeByte(0);
-        socket.writeBytes(addr.bytes, 0, addr.bytes.length);
-        socket.writeByte(mode);
-        socket.writeBytes(tokenBuffer, 0, tokenBuffer.length);
-        
-        socket.flush();
-      }
-      
-      if (socket.connected) {
-        postOpen();
+      if (token == null) {
+        tokenBuffer.writeByte(0);
+        packetLength += 1;
       } else {
-        socket.addEventListener(Event.CONNECT, postOpen);
+        
+        // TODO: Do not use writeUTF. Will send garbage chars in begining of
+        // buffer.
+        tokenBuffer.writeUTF(token);
+        packetLength += tokenBuffer.length;
       }
+      
+      message = new ByteArray();
+      message.writeShort(packetLength);
+      message.writeByte(HydnaPacket.OPEN);
+      message.writeByte(0);
+      message.writeBytes(originalAddr.bytes, 0, addr.bytes.length);
+      message.writeByte(mode);
+      message.writeBytes(tokenBuffer, 0, tokenBuffer.length);
+
+      try {
+        socket.writeBytes(message, 0, message.length);
+        socket.flush();
+      } catch (error:IOErrorEvent) {
+        // Ignore errors. Stream is automaticlly sending a new open when
+        // reconnected.
+        return;
+      }
+      
+      // Empty message queue
+      while ((message = _messageQueue.pop())) {
+        if (!postMessage(message)) {
+          _messageQueue.unshift(message);
+          break;
+        }
+      }
+      
     }
     
     override public function close() : Boolean {
+      var message:ByteArray;
+      
       if (super.close()) {
         if (socket.connected) {
-          socket.writeShort(HydnaPacket.HEADER_SIZE);
-          socket.writeByte(HydnaPacket.CLOSE);
-          socket.writeByte(0);
-          socket.writeBytes(addr.bytes, 0, addr.bytes.length);
-          socket.flush();
+          message = new ByteArray();
+          
+          message.writeShort(HydnaPacket.HEADER_SIZE);
+          message.writeByte(HydnaPacket.CLOSE);
+          message.writeByte(0);
+          message.writeBytes(addr.bytes, 0, addr.bytes.length);
+          
+          try {
+            socket.writeBytes(message, 0, message.length);
+            socket.flush();
+          } catch(error:IOErrorEvent) {
+            // IOErrorEvent internalClose. else wait for an interrupt packet.
+            internalClose(0);
+          }
         } else {
           internalClose(0);
         }
