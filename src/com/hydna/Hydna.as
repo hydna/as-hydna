@@ -270,8 +270,6 @@ package com.hydna {
     private function closeHandler(event:Event) : void {
       var stream:HydnaStream;
 
-      trace("closed by server");
-      
       destroyCurrentSocket();
       
       if (_shutdown) {
@@ -294,7 +292,6 @@ package com.hydna {
 
     private function securityErrorHandler(event:SecurityErrorEvent) : void {
       trace("securityErrorHandler: " + event);
-      trace("here");
       _reconnectTimer.start();
       
     }
@@ -302,7 +299,6 @@ package com.hydna {
     private function reconnectTimerHandler(event:Event) : void {
       _reconnectTimer.stop();
       if (!_shutdown) {
-        trace("reconnectToServer");
         connectInternal();
       }
     }
