@@ -96,8 +96,8 @@ package com.hydna {
      */
     public function Hydna(host:String, 
                           port:uint,
-                          reconnectAttempts=DEFAULT_MAX_CONNECT_ATTEMPTS,
-                          reconnectInterval=DEFAULT_RECONNECT_INTERVAL) {
+                          reconnectAttempts:Number=DEFAULT_MAX_CONNECT_ATTEMPTS,
+                          reconnectInterval:Number=DEFAULT_RECONNECT_INTERVAL) {
       super();
 
       _host = host;
