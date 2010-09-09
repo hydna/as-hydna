@@ -224,6 +224,7 @@ package com.hydna {
           
           message.writeShort(HydnaPacket.HEADER_SIZE);
           message.writeByte(HydnaPacket.CLOSE);
+          message.writeByte(0);
           message.writeBytes(addr.bytes, 0, addr.bytes.length);
           
           try {
