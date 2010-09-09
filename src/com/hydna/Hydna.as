@@ -113,7 +113,7 @@ package com.hydna {
       
       connectInternal();
       
-      _connected = true;
+      _connected = false;
     }
     
     /**
