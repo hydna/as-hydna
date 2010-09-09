@@ -56,8 +56,8 @@ package com.hydna {
     public static const DEFAULT_HOST:String = "127.0.0.1";
     public static const DEFAULT_PORT:Number = 7015;
     
-    public static const DEFAULT_RECONNECT_INTERVAL:Number = 1000;
-    public static const DEFAULT_MAX_CONNECT_ATTEMPTS:Number = 0;
+    public static const DEFAULT_RECONNECT_INTERVAL:Number = 5000;
+    public static const DEFAULT_MAX_CONNECT_ATTEMPTS:Number = 3;
     
     private var _socket:Socket = null;
     private var _streams:Object = new Object();
@@ -94,18 +94,22 @@ package com.hydna {
      *  @param {String} host The name of the host to connect to. 
      *  @param {Number} port The port number to connect to. 
      */
-    public function Hydna(host:String, port:uint) {
+    public function Hydna(host:String, 
+                          port:uint,
+                          reconnectAttempts=DEFAULT_MAX_CONNECT_ATTEMPTS,
+                          reconnectInterval=DEFAULT_RECONNECT_INTERVAL) {
       super();
 
       _host = host;
       _port = port;
       
-      _reconnectTimer = new Timer(DEFAULT_RECONNECT_INTERVAL,
-                                  DEFAULT_MAX_CONNECT_ATTEMPTS);
-      
-      _reconnectTimer.addEventListener("timer", reconnectTimerHandler);
-      _reconnectTimer.addEventListener("timerComplete", 
-                                       reconnectTimerCompleteHandler);
+      if (reconnectAttempts > -1) {
+        _reconnectTimer = new Timer(reconnectAttempts, reconnectInterval);
+
+        _reconnectTimer.addEventListener("timer", reconnectTimerHandler);
+        _reconnectTimer.addEventListener("timerComplete", 
+                                         reconnectTimerCompleteHandler);
+      }
       
       connectInternal();
       
