@@ -53,8 +53,8 @@ package com.hydna {
     public static const MAJOR_VERSION:Number = 1;
     public static const MINOR_VERSION:Number = 0;
     
-    public static const DEFAULT_HOST:String = "127.0.0.1";
-    public static const DEFAULT_PORT:Number = 7015;
+    public static const DEFAULT_HOST:String = "flash.hydna.net";
+    public static const DEFAULT_PORT:Number = 80;
     
     public static const DEFAULT_RECONNECT_INTERVAL:Number = 5000;
     public static const DEFAULT_MAX_CONNECT_ATTEMPTS:Number = 3;
