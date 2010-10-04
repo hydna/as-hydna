@@ -148,6 +148,19 @@ package com.hydna {
       data.writeUTF(value);
       write(data);
     }
+
+    /**
+     *  Writes a UTF-8 string to the stream. Similar to the writeUTF() 
+     *  method, but writeUTFBytes() does not prefix the string with a 16-bit 
+     *  length word.
+     *
+     *  @param {String} value The string to write to the stream.
+     */
+    public function writeUTFBytes(value:String) : void {
+      var data:ByteArray = new ByteArray();
+      data.writeUTF(value);
+      write(data);
+    }
     
     /**
      * Handles socket connect events. Send the OPEN control packet to 
