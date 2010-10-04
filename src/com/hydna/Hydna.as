@@ -57,7 +57,7 @@ package com.hydna {
     public static const DEFAULT_PORT:Number = 80;
     
     public static const DEFAULT_RECONNECT_INTERVAL:Number = 5000;
-    public static const DEFAULT_MAX_CONNECT_ATTEMPTS:Number = 3;
+    public static const DEFAULT_MAX_CONNECT_ATTEMPTS:Number = -1;
     
     private var _socket:Socket = null;
     private var _streams:Object = new Object();
@@ -104,7 +104,7 @@ package com.hydna {
       _port = port;
       
       if (reconnectAttempts > -1) {
-        _reconnectTimer = new Timer(reconnectAttempts, reconnectInterval);
+        _reconnectTimer = new Timer(reconnectInterval, reconnectAttempts);
 
         _reconnectTimer.addEventListener("timer", reconnectTimerHandler);
         _reconnectTimer.addEventListener("timerComplete", 
