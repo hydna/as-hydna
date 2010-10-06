@@ -129,28 +129,58 @@ package com.hydna {
      *
      */
     public function get reconnectInterval() : Number {
-      return _reconnectTimer.delay;
+      if (_reconnectTimer != null) {
+        return _reconnectTimer.delay;
+      } else {
+        return -1;
+      }
     }
+
+    _reconnectTimer = new Timer(reconnectInterval, reconnectAttempts);
+
+    _reconnectTimer.addEventListener("timer", reconnectTimerHandler);
+    _reconnectTimer.addEventListener("timerComplete", 
+                                     reconnectTimerCompleteHandler);
 
     /**
      *
      */
     public function set reconnectInterval(value:Number) : void {
-      _reconnectTimer.delay = value;
+      if (_reconnectTimer !== null) {
+        _reconnectTimer.delay = value;
+      } else {
+        _reconnectTimer = new Timer(value, DEFAULT_MAX_CONNECT_ATTEMPTS);
+
+        _reconnectTimer.addEventListener("timer", reconnectTimerHandler);
+        _reconnectTimer.addEventListener("timerComplete", 
+                                         reconnectTimerCompleteHandler);
+      }
     }
 
     /**
      *
      */
     public function get maxConnectAttempts() : Number {
-      return _reconnectTimer.repeatCount;
+      if (_reconnectTimer !== null) {
+        return _reconnectTimer.repeatCount;
+      } else {
+        return -1;
+      }
     }
 
     /**
      *
      */
     public function set maxConnectAttempts(value:Number) : void {
-      _reconnectTimer.repeatCount = value;
+      if (_reconnectTimer !== null) {
+        _reconnectTimer.repeatCount = value;
+      } else {
+        _reconnectTimer = new Timer(DEFAULT_RECONNECT_INTERVAL, value);
+
+        _reconnectTimer.addEventListener("timer", reconnectTimerHandler);
+        _reconnectTimer.addEventListener("timerComplete", 
+                                         reconnectTimerCompleteHandler);
+      }
     }
     
     /**
@@ -263,7 +293,9 @@ package com.hydna {
         }
       }
       
-      _reconnectTimer.reset();
+      if (_reconnectTimer != null) {
+        _reconnectTimer.reset();
+      }
       
       // Only fire the connect event first time connected.
       if (_connected == false) {
@@ -287,7 +319,9 @@ package com.hydna {
         stream.setSocket(null);
       }
       
-      _reconnectTimer.start();
+      if (_reconnectTimer) {
+        _reconnectTimer.start();
+      }
     }
 
     private function ioErrorHandler(event:IOErrorEvent) : void {
@@ -296,12 +330,18 @@ package com.hydna {
 
     private function securityErrorHandler(event:SecurityErrorEvent) : void {
       trace("securityErrorHandler: " + event);
-      _reconnectTimer.start();
-      
+
+      if (_reconnectTimer) {
+        _reconnectTimer.start();
+      }
     }
     
     private function reconnectTimerHandler(event:Event) : void {
-      _reconnectTimer.stop();
+      
+      if (_reconnectTimer) {
+        _reconnectTimer.stop();
+      }
+      
       if (!_shutdown) {
         connectInternal();
       }
