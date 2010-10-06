@@ -158,7 +158,7 @@ package com.hydna {
      */
     public function writeUTFBytes(value:String) : void {
       var data:ByteArray = new ByteArray();
-      data.writeUTF(value);
+      data.writeUTFBytes(value);
       write(data);
     }
     
