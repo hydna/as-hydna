@@ -1,4 +1,4 @@
-// HydnaAddr.as
+// Addr.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.

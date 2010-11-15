@@ -1,4 +1,4 @@
-// HydnaStreamState.as
+// StreamMode.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
