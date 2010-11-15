@@ -1,4 +1,4 @@
-// HydnaPacket.as
+// HydnaDataEvent.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -30,34 +30,36 @@
  *  those of the authors and should not be interpreted as representing 
  *  official policies, either expressed or implied, of Hydna AB.
  */ 
-package com.hydna {
+package hydna.net {
   
-  /**
-   *  A Hydna Packet utility class. Should not be used directly.
-   *
-   */
-  public class HydnaPacket {
+  import flash.events.Event;
+  import flash.utils.ByteArray;
+  
+  public class StreamSignalEvent extends Event {
     
-    public static const HEADER_SIZE:Number = 20;
+    public static const SIGNAL:String = "signal";
     
-    public static const PING:Number      = 0x01;
+    private var _data:ByteArray;
+    private var _type:Number;
     
-    public static const OPEN:Number      = 0x02;
-    public static const EMIT:Number      = 0x04;
-    public static const CLOSE:Number     = 0x05;
-
-    public static const OPENSTAT:Number  = 0x06;
-    public static const DATA:Number      = 0x08;
-    public static const INTERRUPT:Number = 0x09;
-
-    public static const SUCCESS:Number = 0;
-
-    public static const ADDR_SIZE:Number = 16;
-
-    public static const OPENSTAT_PACKET_SIZE:Number = 17;
-    public static const INTERRUPT_PACKET_SIZE:Number = 2;
+    public function StreamSignalEvent(type:Number, data:ByteArray) {
+      super(SIGNAL, false, false);
+      _type = type;
+      _data = data;
+    }
+    
+    public function get channel() : Number {
+      return _type;
+    }
+    
+    /**
+     *  Returns the data associated with this HydnaDataEvent instance.
+     */
+    public function get data() : ByteArray {
+      return _data;
+    }
+    
   }
-
-
-
+  
+  
 }

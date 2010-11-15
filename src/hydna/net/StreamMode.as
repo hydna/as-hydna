@@ -1,4 +1,4 @@
-// HydnaDataEvent.as
+// HydnaStreamState.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -30,32 +30,17 @@
  *  those of the authors and should not be interpreted as representing 
  *  official policies, either expressed or implied, of Hydna AB.
  */ 
-package com.hydna {
+package hydna.net {
   
-  import flash.events.Event;
-  import flash.utils.ByteArray;
-  
-  import com.hydna.HydnaAddr;
-
-  public class HydnaDataEvent extends Event {
+  public class StreamMode {
     
-    public static const DATA:String = "data";
-    
-    private var _data:ByteArray;
-    
-    public function HydnaDataEvent(data:ByteArray) {
-      super(DATA, false, false);
-      _data = data;
-    }
-    
-    /**
-     *  Returns the data associated with this HydnaDataEvent instance.
-     */
-    public function get data() : ByteArray {
-      return _data;
-    }
+    public static const READ:Number = 0x01;
+    public static const WRITE:Number = 0x02;
+    public static const READWRITE:Number = 0x03;
+    public static const READ_SIG:Number = 0x05;
+    public static const WRITE_SIG:Number = 0x06;
+    public static const READWRITE_SIG:Number = 0x07;
     
   }
-  
   
 }

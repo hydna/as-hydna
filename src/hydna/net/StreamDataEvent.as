@@ -1,4 +1,4 @@
-// HydnaStreamType.as
+// HydnaDataEvent.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -30,14 +30,36 @@
  *  those of the authors and should not be interpreted as representing 
  *  official policies, either expressed or implied, of Hydna AB.
  */ 
-package com.hydna {
+package hydna.net {
   
-  public class HydnaStreamType {
+  import flash.events.Event;
+  import flash.utils.ByteArray;
+  
+  public class StreamDataEvent extends Event {
     
     public static const DATA:String = "data";
-    public static const PING:String = "ping";
-    public static const META:String = "meta";
+    
+    private var _data:ByteArray;
+    private var _priority:Number
+    
+    public function StreamDataEvent(priority:Number, data:ByteArray) {
+      super(DATA, false, false);
+      _data = data;
+      _priority = priority;
+    }
+    
+    /**
+     *  Returns the data associated with this StreamDataEvent instance.
+     */
+    public function get data() : ByteArray {
+      return _data;
+    }
+    
+    public function get priority() : Number {
+      return _priority;
+    }
     
   }
+  
   
 }

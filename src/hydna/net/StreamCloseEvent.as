@@ -1,4 +1,4 @@
-// HydnaStreamState.as
+// StreamCloseEvent.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -30,14 +30,48 @@
  *  those of the authors and should not be interpreted as representing 
  *  official policies, either expressed or implied, of Hydna AB.
  */ 
-package com.hydna {
+package hydna.net {
   
-  public class HydnaDataStreamMode {
+  import flash.events.Event;
+
+  public class StreamCloseEvent extends Event {
     
-    public static const READ:String = "read";
-    public static const WRITE:String = "write";
-    public static const READWRITE:String = "readwrite";
+    private var _code:Number = 0;
+    private var _message:String;
     
+    /**
+     *  Constructor for the StreamCloseEvent
+     *
+     *  @param code The end code for this event. Default is 0
+     *  @param message An optional message to associate with the event.
+     */
+    public function StreamCloseEvent(message:String, code:Number=0) {
+      super(Event.CLOSE, false, false);
+      _code = code;
+      _message = message;
+    }
+    
+    public function get message() : String {
+      return _message;
+    }
+        
+    public function get code() : Number {
+      return _code;
+    }
+    
+    public static function fromCode( code:Number
+                                   , endMessage:String=null) 
+                                   : StreamCloseEvent {
+      var message:String;
+      
+      switch (code) {
+        default:
+        case 0x01: message = "Unknown reason"; break;
+        case 0x02: message = "EOT - End of transmission"; break;
+        case 0x0F: message = "Unknown reason"; break; // User-defined.
+      }
+      
+      return new StreamCloseEvent(endMessage || message, code);
+    }
   }
-  
 }

@@ -1,4 +1,4 @@
-// HydnaErrorEvent.as
+// OpenRequest.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -29,51 +29,50 @@
  *  The views and conclusions contained in the software and documentation are 
  *  those of the authors and should not be interpreted as representing 
  *  official policies, either expressed or implied, of Hydna AB.
- */ 
-package com.hydna {
+ */
+ 
+package hydna.net {
   
-  import flash.events.Event;
+  import flash.utils.ByteArray;
+  
+  import hydna.net.Addr;
+  import hydna.net.Message;
+  import hydna.net.Stream;
+  
+  // Internal class to handle open requests.
+  internal class OpenRequest {
 
-  public class HydnaErrorEvent extends Event {
-    
-    public static const ERROR:String = "error";
-    
-    private var _code:Number = 0;
-    private var _message:String;
-    
-    /**
-     *  Constructor for the HydnaErrorEvent
-     *
-     *  @param {Number} code The error code for this event. Default is 0
-     *  @param {String} message An optional message to associate with the
-     *                          event.
-     */
-    public function HydnaErrorEvent(code:Number=0, 
-                                     message:String="Unkown Error") {
-      super(ERROR, false, false);
-      _code = code;
+    internal var _stream:Stream;
+    internal var _addr:Addr;
+    internal var _message:Message;
+    internal var _sent:Boolean;
+
+    public function OpenRequest( stream:Stream
+                               , addr:Addr
+                               , message:Message) {
+      _stream = stream;
+      _addr = addr;
       _message = message;
     }
-    
-    /**
-     *  Gets the associated error message for this HydnaErrorEvent instance.
-     *
-     *  @return {String} error message.
-     */
-    public function get message() : String {
+
+    public function get stream() : Stream {
+      return _stream;
+    }
+
+    public function get addr() : Addr {
+      return _addr;
+    }
+
+    public function get message() : Message {
       return _message;
     }
-    
-    /**
-     *  Returns the error code for this HydnaErrorEvent instance.
-     *
-     *  @return {Number} the error code.
-     */
-    public function get code() : Number {
-      return _code;
+
+    public function get sent() : Boolean {
+      return _sent;
     }
-    
+
+    public function set sent(value:Boolean) : void {
+      _sent = value;
+    }
   }
-  
-  
 }
