@@ -227,7 +227,7 @@ package hydna.net {
      *  method, but writeUTFBytes() does not prefix the string with a 16-bit 
      *  length word.
      *
-     *  @param {String} value The string to write to the stream.
+     *  @param value The string to write to the stream.
      */
     public function writeUTFBytes(value:String) : void {
       var data:ByteArray = new ByteArray();
@@ -235,7 +235,14 @@ package hydna.net {
       writeBytes(data);
     }
     
-    
+    /**
+     *  Sends a signal to the stream.
+     *
+     *  <p>Note: Signal write access is permitted in order to send via
+     *     network.</p>
+     *
+     *  @param value The string to write to the stream.
+     */
     public function sendSignal( data:ByteArray
                               , offset:uint=0
                               , length:uint=0
@@ -257,6 +264,12 @@ package hydna.net {
       _socket.flush();
     }
 
+    /**
+     *  Sends a UTF-8 signal to the stream. 
+     *
+     *  @param value The string to write to the stream.
+     *  @param type An optional type for the signal. 
+     */
     public function sendUTFSignal(value:String, type:Number=0) : void {
       var data:ByteArray = new ByteArray();
       data.writeUTFBytes(value);
@@ -312,6 +325,7 @@ package hydna.net {
       } 
     }
     
+    // Internally close stream
     private function internalClose() : void {
       var event:Event = null;
       var message:Message;
