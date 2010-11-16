@@ -1,4 +1,4 @@
-// HydnaSocket.as
+// ExtSocket.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -51,7 +51,7 @@ package hydna.net {
   import hydna.net.StreamSignalEvent;
   
   // Internal wrapper around flash.net.Socket
-  internal class HydnaSocket extends Socket {
+  internal class ExtSocket extends Socket {
 
     private static const HANDSHAKE_SIZE:Number = 9;
     private static const HANDSHAKE_RESP_SIZE:Number = 6;
@@ -78,13 +78,13 @@ package hydna.net {
     }
     
     // Return an available socket or create a new one.
-    internal static function getSocket(addr:Addr) : HydnaSocket {
-      var socket:HydnaSocket;
+    internal static function getSocket(addr:Addr) : ExtSocket {
+      var socket:ExtSocket;
       
       if (availableSockets[addr.zone]) {
         socket = availableSockets[addr.zone];
       } else {
-        socket = new HydnaSocket(addr.zone);
+        socket = new ExtSocket(addr.zone);
         availableSockets[addr.zone] = socket;
       }
       
@@ -94,7 +94,7 @@ package hydna.net {
     /**
      *  Initializes a new Stream instance
      */
-    public function HydnaSocket(zoneid:uint) {
+    public function ExtSocket(zoneid:uint) {
       super();
 
       _zone = zoneid;

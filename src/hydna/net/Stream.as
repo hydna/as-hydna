@@ -51,7 +51,7 @@ package hydna.net {
     
     private var _addr:Addr = null;
 
-    private var _socket:HydnaSocket = null;
+    private var _socket:ExtSocket = null;
     private var _connected:Boolean = false;
     private var _pendingClose:Boolean = false;
     
@@ -153,7 +153,7 @@ package hydna.net {
       _writable = ((_mode & StreamMode.WRITE) == StreamMode.WRITE);
       _signalSupport = ((_mode & 0x04) == 0x04);
       
-      _socket = HydnaSocket.getSocket(_addr);
+      _socket = ExtSocket.getSocket(_addr);
       
       // Ref count
       _socket.allocStream();
