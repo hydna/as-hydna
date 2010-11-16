@@ -45,7 +45,6 @@ package hydna.net {
   import hydna.net.Message;
   import hydna.net.OpenRequest;
   import hydna.net.Stream;
-  import hydna.net.StreamCloseEvent;
   import hydna.net.StreamDataEvent;
   import hydna.net.StreamErrorEvent;
   import hydna.net.StreamSignalEvent;
@@ -57,7 +56,7 @@ package hydna.net {
     private static const HANDSHAKE_RESP_SIZE:Number = 6;
 
     private static const SUCCESS:Number = 0;
-    private static const CUSTOM_ERR_CODE:Number = 15;
+    private static const CUSTOM_ERR_CODE:Number = 0xf;
     
     private static var availableSockets:Dictionary;
 
@@ -332,10 +331,6 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
 
           case Message.END:
             processEndMessage(addr, flag, payload);
-            break;
-            
-          case Message.ERROR:
-            processErrorMessage(addr, flag, payload);
             return;
         }
       }
@@ -463,44 +458,23 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
 
     // process an end message
     private function processEndMessage( addr:uint
-                                      , endcode:Number
-                                      , payload:ByteArray) : void {
+                                       , errcode:Number
+                                       , payload:ByteArray) : void {
       var stream:Stream;
-      var event:StreamCloseEvent;                
-      
-      stream = Stream(_openStreams[addr]);
-      
-      // ignore the end message if no streams attached. This could
-      // cause conflicts if send's a CLOSE message while server is ending
-      // an transmission and user is opening a stream with same address.
-      // 
-      // The easiest way of ignoring this now is just to ignore if stream
-      // isn't open.
-      if (stream == null) {
-        return;
-      }
-      
-      // TODO: What happens if a Stream is bein open (pendingOpenRequest) and
-      // a stream end is signaled? 
-      
-      if (endcode == CUSTOM_ERR_CODE && payload != null && payload.length) {
-        event = StreamCloseEvent.fromCode(endcode, 
-                    payload.readUTFBytes(payload.length));
-      } else {
-        event = StreamCloseEvent.fromCode(endcode);
-      }
-      
-      dispatchEvent(event);
-    }
+      var event:Event;
+			var erroff:Number = addr == 0 ? 0 : 0x100;
 
-    // process an end message
-    private function processErrorMessage( addr:uint
-                                        , errcode:Number
-                                        , payload:ByteArray) : void {
-      var stream:Stream;
-      var event:StreamErrorEvent;
-      
-      event = StreamErrorEvent.fromErrorCode(errcode);
+			if (errcode == 0) {
+				event = new Event(Event.CLOSE);
+			} else {
+				
+				if (errcode == CUSTOM_ERR_CODE && payload != null && payload.length) {
+	        event = StreamErrorEvent.fromErrorCode(erroff + errcode, 
+	                   										payload.readUTFBytes(payload.length));
+	      } else {
+	        event = StreamErrorEvent.fromErrorCode(erroff + errcode);
+	      }
+			}
       
       // Global error?
       if (addr == 0) {

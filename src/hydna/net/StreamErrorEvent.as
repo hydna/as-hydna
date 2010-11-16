@@ -71,7 +71,7 @@ package hydna.net {
         default:
         case 0x01: message = "Unknown Error"; break;
 
-        // Stream related error codes
+        // Socket related error codes (also related to handshakes)
         case 0x02: message = "Bad message format"; break;
         case 0x03: message = "Multiple ACK request to same addr"; break;
         case 0x04: message = "Invalid operator"; break;
@@ -88,12 +88,14 @@ package hydna.net {
         case 0x12: message = "Invalid Domain"; break;
         
         // OPENRESP releated error codes
-        case 0x101: message = "Not found"; break;
+        case 0x102: message = "Stream is not available"; break;
+				case 0x103: message = "Protocol not allowed"; break;
+				case 0x104: message = "Unauthorized"; break;
         case 0x10F: message = ""; break; // User-defined
 
-        // End releated error codes
-        // case 0x111: message = "End of transmission"; break;
-        // case 0x11F: message = ""; break; // User-defined.
+        // Stream releated error end codes
+        case 0x111: message = "End of transmission"; break;
+        case 0x11F: message = ""; break; // User-defined.
         
         // Library specific error codes
         case 0x1001: message = "Server responed with bad handshake"; break

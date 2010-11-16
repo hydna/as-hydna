@@ -51,8 +51,7 @@ package hydna.net {
     internal static const OPENRESP:Number = 0x01;
     internal static const DATA:Number = 0x03;
     internal static const SIGNAL:Number = 0x04;
-    internal static const END:Number = 0x0E;
-    internal static const ERROR:Number = 0x0F;
+    internal static const END:Number = 0x0F;
 
 
     public function Message( addr:Addr
