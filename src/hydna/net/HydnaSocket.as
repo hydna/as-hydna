@@ -531,6 +531,9 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
     // Finalize the Socket
     private function destroy(errorEvent:Event=null) : void {
       var event:Event = errorEvent;
+			var pending:Dictionary = _pendingOpenRequests;
+			var waitqueue:Dictionary = _openWaitQueue;
+			var openstreams:Dictionary = _openStreams;
       var key:Object;
       var i:Number;
       var l:Number;
@@ -546,44 +549,48 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
       removeEventListener(SecurityErrorEvent.SECURITY_ERROR, 
                                   securityErrorHandler);
 
-      // So we do not trigger ref count destroy by accident.
-      _streamRefCount = 0;
+			// So we do not trigger destroy multiple times.
+			_pendingOpenRequests = null;
+			_openWaitQueue = null;
+			_openStreams = null;
       
       if (event == null) {
         event = StreamErrorEvent.fromErrorCode(0x01);
       }
 
-      for (key in _pendingOpenRequests) {
-        OpenRequest(_pendingOpenRequests[key]).stream.destroy(event);
-      }
+			if (pending != null) {
+	      for (key in pending) {
+	        OpenRequest(pending[key]).stream.destroy(event);
+	      }
+			}
       
-      _pendingOpenRequests = null;
-
-      for (key in _openWaitQueue) {
-        queue = _openWaitQueue[key] as Array;
-        for (i = 0, l = queue.length; i < l; i++) {
-          Stream(queue[i]).destroy(event);
-        }
-      }
-      
-      _openWaitQueue = null;
-
-      trace("destroy: destroy open streams");
-      for (key in _openStreams) {
-        trace("destroy stream of key: " + key);
-        Stream(_openStreams[key]).destroy(event);
-      }
-      
-      _openStreams = null;
+			if (waitqueue != null) {
+	      for (key in waitqueue) {
+	        queue = waitqueue[key] as Array;
+	        for (i = 0, l = queue.length; i < l; i++) {
+	          OpenRequest(queue[i]).stream.destroy(event);
+	        }
+	      }
+			}
+			
+			if (openstreams != null) {
+	      for (key in openstreams) {
+	        trace("destroy stream of key: " + key);
+	        Stream(openstreams[key]).destroy(event);
+	      }				
+			}
       
       if (connected) {
         trace("destroy: call close");
         close();
       }
       
-      trace("destroy: done");
       
-      delete availableSockets[_zone];
+			if (availableSockets[_zone]) {
+      	delete availableSockets[_zone];
+			}
+
+      trace("destroy: done");
     }
     
   }
