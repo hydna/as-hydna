@@ -395,7 +395,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
         
         // Destroy all pending request IF response wasn't a 
         // redirected stream.
-        if (respaddr == addr) {
+        if (errcode == SUCCESS && respaddr == addr) {
           delete _pendingOpenRequests[addr];
           
           while ((request = OpenRequest(_openWaitQueue[addr].pop()))) {
