@@ -391,7 +391,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
         stream.dispatchEvent(event);
       }
       
-      if (_openWaitQueue[addr]) {
+      if (_openWaitQueue[addr] && _openWaitQueue[addr].length) {
         
         // Destroy all pending request IF response wasn't a 
         // redirected stream.
