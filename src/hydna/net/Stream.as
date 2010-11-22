@@ -57,7 +57,7 @@ package hydna.net {
     
     private var _readable:Boolean = false;
     private var _writable:Boolean = false;
-    private var _signalSupport:Boolean = false;
+    private var _emitable:Boolean = false;
 
     private var _mode:Number;
     
@@ -141,9 +141,7 @@ package hydna.net {
       
       _addr = Addr.fromExpr(addrExpr);
                              
-      if (mode == 0x04 ||
-          mode < StreamMode.READ || 
-          mode > StreamMode.READWRITE_SIG) {
+      if (mode < 0 || mode > StreamMode.READWRITE_EMIT) {
         throw new Error("Invalid stream mode");
       }
       
@@ -151,7 +149,7 @@ package hydna.net {
       
       _readable = ((_mode & StreamMode.READ) == StreamMode.READ);
       _writable = ((_mode & StreamMode.WRITE) == StreamMode.WRITE);
-      _signalSupport = ((_mode & 0x04) == 0x04);
+      _emitable = ((_mode & StreamMode.EMIT) == StreamMode.EMIT);
       
       _socket = ExtSocket.getSocket(_addr);
       
@@ -201,7 +199,7 @@ package hydna.net {
         throw new RangeError("Priority must be between 0 - 3");
       }
       
-      message = new Message(_addr, Message.EMIT, priority,
+      message = new Message(_addr, Message.DATA, priority,
                             data, offset, length);
 
 
@@ -236,14 +234,14 @@ package hydna.net {
     }
     
     /**
-     *  Sends a signal to the stream.
+     *  Emit's a signal to the stream.
      *
-     *  <p>Note: Signal write access is permitted in order to send via
-     *     network.</p>
+     *  <p>Note: Stream must be opened with the mode EMIT in order to use 
+     *     the emit method.</p>
      *
      *  @param value The string to write to the stream.
      */
-    public function sendSignal( data:ByteArray
+    public function emit( data:ByteArray
                               , offset:uint=0
                               , length:uint=0
                               , type:uint=0) : void {
@@ -253,7 +251,7 @@ package hydna.net {
         throw new IOError("Stream is not connected.");
       }
 
-      if ((_mode & 0x4) == 0x4) {
+      if ((_mode & StreamMode.EMIT) == StreamMode.EMIT) {
         throw new Error("You do not have permission to send signals");
       }
 
@@ -265,15 +263,15 @@ package hydna.net {
     }
 
     /**
-     *  Sends a UTF-8 signal to the stream. 
+     *  Emit's an UTF-8 signal to the stream. 
      *
-     *  @param value The string to write to the stream.
+     *  @param value The string to emit to the stream.
      *  @param type An optional type for the signal. 
      */
-    public function sendUTFSignal(value:String, type:Number=0) : void {
+    public function emitUTFBytes(value:String, type:Number=0) : void {
       var data:ByteArray = new ByteArray();
       data.writeUTFBytes(value);
-      sendSignal(data);
+      emit(data);
     }
     
     /**

@@ -34,12 +34,14 @@ package hydna.net {
   
   public class StreamMode {
     
-    public static const READ:Number = 0x01;
+    public static const LISTEN:Number = 0x00;
+		public static const READ:Number = 0x01;
     public static const WRITE:Number = 0x02;
     public static const READWRITE:Number = 0x03;
-    public static const READ_SIG:Number = 0x05;
-    public static const WRITE_SIG:Number = 0x06;
-    public static const READWRITE_SIG:Number = 0x07;
+    public static const EMIT:Number = 0x04;
+    public static const READ_EMIT:Number = 0x05;
+    public static const WRITE_EMIT:Number = 0x06;
+    public static const READWRITE_EMIT:Number = 0x07;
     
   }
   

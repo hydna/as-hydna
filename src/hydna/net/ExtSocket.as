@@ -52,8 +52,8 @@ package hydna.net {
   // Internal wrapper around flash.net.Socket
   internal class ExtSocket extends Socket {
 
-    private static const HANDSHAKE_SIZE:Number = 9;
-    private static const HANDSHAKE_RESP_SIZE:Number = 6;
+    private static const HANDSHAKE_SIZE:Number = 8;
+    private static const HANDSHAKE_RESP_SIZE:Number = 5;
 
     private static const SUCCESS:Number = 0;
     private static const CUSTOM_ERR_CODE:Number = 0xf;
@@ -223,7 +223,7 @@ package hydna.net {
 
       addEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
 
-      writeMultiByte("DNA10", "us-acii");
+      writeMultiByte("DNA1", "us-acii");
       writeUnsignedInt(_zone);
       
       try {
@@ -251,7 +251,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
       }
       
       if (_receiveBuffer.readMultiByte(HANDSHAKE_RESP_SIZE - 1, "us-acii") 
-          !== "DNA10") {
+          !== "DNA1") {
         dispatchEvent(StreamErrorEvent.fromErrorCode(0x1001));
         return;
       }

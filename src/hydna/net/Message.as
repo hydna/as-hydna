@@ -41,18 +41,14 @@ package hydna.net {
     
     internal static const HEADER_SIZE:Number = 0x08;
     
-    // Client opcodes
+    // Opcodes
     internal static const OPEN:Number =  0x01;
-    internal static const CLOSE:Number =  0x02;
-    internal static const EMIT:Number =  0x03;
-    internal static const SEND:Number =  0x04;
-    
-    // Server opcodes
     internal static const OPENRESP:Number = 0x01;
+    internal static const CLOSE:Number =  0x02;
     internal static const DATA:Number = 0x03;
     internal static const SIGNAL:Number = 0x04;
     internal static const END:Number = 0x0F;
-
+    
 
     public function Message( addr:Addr
                            , op:uint
