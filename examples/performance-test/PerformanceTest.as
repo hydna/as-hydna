@@ -38,11 +38,10 @@ package {
   import flash.text.TextField;
   import flash.utils.ByteArray;
 
-  import com.hydna.Hydna;
-  import com.hydna.HydnaAddr;
-  import com.hydna.HydnaDataStream;
-  import com.hydna.HydnaDataStreamMode;
-  import com.hydna.HydnaDataEvent;
+  import hydna.net.Stream;
+  import hydna.net.StreamMode;
+  import hydna.net.StreamDataEvent;
+  import hydna.net.StreamSignalEvent;
   
   /**
    *  Hydna Actionscript Performance Test 
@@ -54,57 +53,40 @@ package {
    */
   public class PerformanceTest extends Sprite {
     
-    public static const HOST:String = "127.0.0.1";
-    public static const PORT:Number = 7015;
-    
-    public static const ADDRESS:String = "0000:0000:AABB:CCDD:0000:0000:EEFF:2255";
+    public static const ADDRESS:String = "00112233-00112233";
     
     public static const MESSAGE_COUNT:Number = 100000;
     public static const MESSAGE:String = "This is a performance test!";
     
     public function PerformanceTest() {
-      var output:TextField = new TextField();
-      var hydna:Hydna;
-      var stream:HydnaDataStream;
+      var stream:Stream;
       var starttime:Number;
       var messagesReceived:Number = 0;
       
-      output.width = 400;
-      addChild(output);
+      trace("Hydna Actionscript Performance Test\n");
       
-      output.appendText("Hydna Actionscript Performance Test\n");
+			stream = new Stream();
       
-      hydna = Hydna.connect(HOST, PORT);
-      
-      stream = hydna.open(HydnaAddr.fromHex(ADDRESS), 
-                          HydnaDataStreamMode.READWRITE);
-      
-      stream.addEventListener(Event.OPEN, 
-        function() : void {
-          
-          output.appendText("Sending " + MESSAGE_COUNT + " messages ("
-                            + MESSAGE.length + " bytes each)...\n");
-              
-          starttime = (new Date()).getTime();
+      stream.addEventListener("connect", function() : void {
+        trace("Sending " + MESSAGE_COUNT + " messages (" + 
+              MESSAGE.length + " bytes each)...");
+             
+         starttime = (new Date()).getTime();
 
-          for (var i:Number = 0; i < MESSAGE_COUNT; i++) {
-            stream.writeUTF(MESSAGE);
-          }
-        }
-      );
+         for (var i:Number = 0; i < MESSAGE_COUNT; i++) {
+           stream.writeUTF(MESSAGE);
+         }
+      });
 
-      stream.addEventListener(HydnaDataEvent.DATA, 
-        function(event:HydnaDataEvent) : void {
+      stream.addEventListener("data", function(event:StreamDataEvent) : void {
           if (++messagesReceived == MESSAGE_COUNT) {
             var time:Number = ((new Date()).getTime() - starttime); 
-            output.appendText("Done in " + time + " milliseconds\n");
-            hydna.shutdown();
+            trace("Done in " + time + " milliseconds\n");
+            stream.close();
           }
-        }
-      );
-      
-    }
-    
-  }
+      });
 
+			stream.connect(ADDRESS, StreamMode.READWRITE);
+    }
+  }
 }
