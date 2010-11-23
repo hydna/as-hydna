@@ -40,11 +40,10 @@ package {
   import flash.text.TextFieldAutoSize;
   import flash.utils.ByteArray;
 
-  import com.hydna.Hydna;
-  import com.hydna.HydnaAddr;
-  import com.hydna.HydnaDataStream;
-  import com.hydna.HydnaDataStreamMode;
-  import com.hydna.HydnaDataEvent;
+  import hydna.net.Stream;
+  import hydna.net.StreamMode;
+  import hydna.net.StreamDataEvent;
+  import hydna.net.StreamSignalEvent;
   
   /**
    *  Hello world example Application
@@ -52,72 +51,37 @@ package {
    */
   public class HelloWorld extends Sprite {
 
-    public static const HOST:String = "127.0.0.1";
-    public static const PORT:Number = 7015;
-    
-    public static const ADDRESS:String = "0000:0000:AABB:CCDD:0000:0000:EEFF:2255";
+    public static const ADDRESS:String = "00112233-00112233";
     
     public function HelloWorld() {
-      var output:TextField = new TextField();
-      var send:TextField = new TextField();
-      var hydna:Hydna;
-      var stream:HydnaDataStream;
+      var stream:Stream;
       
-      send.text = "Click to send 'Hello World' message";
-      send.autoSize = TextFieldAutoSize.CENTER;
-      send.background = true;
-      send.backgroundColor = 0xAAAAAA;
-      send.visible = false;
-      send.x = 100;
-      send.width = 120;
-      send.addEventListener(MouseEvent.CLICK, 
-        function(event:MouseEvent) : void {
-          output.appendText("Sending 'Hello World!' message...\n");
-          stream.writeUTF("Hello World!");
-        }
-      );
-      addChild(send);
+      trace("Hydna Flash Hello Example");
       
-      output.y = 30;
-      output.width = 400;
-      output.height = 400;
-      addChild(output);
-      
-      output.appendText("Hydna Hello World Example\n");
+      stream = new Stream();
 
-      hydna = Hydna.connect(HOST, PORT);
-      
-      stream = hydna.open(HydnaAddr.fromHex(ADDRESS), 
-                          HydnaDataStreamMode.READWRITE);
-      
-      stream.addEventListener(Event.OPEN, 
-        function() : void {
-          output.appendText("Connected with Hydna Network\n");
-          send.visible = true;
-        }
-      );
+      stream.addEventListener("error", function(e:Event) : void {
+        trace("An error occured: " + e.toString());
+      });
 
-      stream.addEventListener(HydnaDataEvent.DATA, 
-        function(event:HydnaDataEvent) : void {
-          var data:String = event.data.readUTF();
-          output.appendText("Receivied '" + data + "' from network...\n\n");
-        }
-      );
+      stream.addEventListener("data", function(e:StreamDataEvent) : void {
+        trace("Data received: " + e.data.readUTFBytes(e.data.length));
+				trace("Emitting a signal");
+        stream.emitUTFBytes("ping");
+      });
 
-      stream.addEventListener(Event.CLOSE, 
-        function(event:Event) : void {
-          output.appendText("Stream is now closed\n");
-        }
-      );
-      
-      hydna.addEventListener(Event.CLOSE, 
-        function(event:Event) : void {
-          output.appendText("Hydna is now closed\n\n");
-        }
-      );
-    }
-    
-  }
-  
+      stream.addEventListener("signal", function(e:StreamSignalEvent) : void {
+        trace("Signal received: " + e.data.readUTFBytes(e.data.length));
+				trace("Now closing");
+				stream.close();
+      });
 
+      stream.addEventListener("connect", function(e:Event) : void {
+        trace("Connected with Hydna, sending a 'Hello'.");
+        stream.writeUTFBytes("ping");
+      });
+
+      stream.connect(ADDRESS, StreamMode.READWRITE);
+  	}
+	}
 }
