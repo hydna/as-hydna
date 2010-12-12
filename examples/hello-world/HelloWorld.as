@@ -43,7 +43,7 @@ package {
   import hydna.net.Stream;
   import hydna.net.StreamMode;
   import hydna.net.StreamDataEvent;
-  import hydna.net.StreamSignalEvent;
+  import hydna.net.StreamEmitEvent;
   
   /**
    *  Hello world example Application
@@ -70,7 +70,7 @@ package {
         stream.emitUTFBytes("ping");
       });
 
-      stream.addEventListener("signal", function(e:StreamSignalEvent) : void {
+      stream.addEventListener("emit", function(e:StreamEmitEvent) : void {
         trace("Signal received: " + e.data.readUTFBytes(e.data.length));
 				trace("Now closing");
 				stream.close();

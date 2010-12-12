@@ -1,4 +1,4 @@
-// HydnaSignalEvent.as
+// StreamEmitEvent.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -35,25 +35,24 @@ package hydna.net {
   import flash.events.Event;
   import flash.utils.ByteArray;
   
-  public class StreamSignalEvent extends Event {
+  public class StreamEmitEvent extends Event {
     
-    public static const SIGNAL:String = "signal";
+    public static const EMIT:String = "emit";
     
     private var _data:ByteArray;
-    private var _type:Number;
     
-    public function StreamSignalEvent(type:Number, data:ByteArray) {
-      super(SIGNAL, false, false);
-      _type = type;
-      _data = data;
-    }
-    
-    public function get channel() : Number {
-      return _type;
+    public function StreamEmitEvent(data:ByteArray) {
+      super(EMIT, false, false);
+      
+      if (data == null) {
+        _data = new ByteArray();
+      } else {
+        _data = data;
+      }
     }
     
     /**
-     *  Returns the data associated with this HydnaDataEvent instance.
+     *  Returns the data associated with this StreamEmitEvent instance.
      */
     public function get data() : ByteArray {
       return _data;

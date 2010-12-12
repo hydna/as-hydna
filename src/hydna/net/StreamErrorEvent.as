@@ -1,4 +1,4 @@
-// HydnaErrorEvent.as
+// StreamErrorEvent.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -33,6 +33,7 @@
 package hydna.net {
   
   import flash.events.ErrorEvent;
+  import flash.utils.ByteArray;
 
   public class StreamErrorEvent extends ErrorEvent {
     
@@ -62,53 +63,111 @@ package hydna.net {
       return new StreamErrorEvent(event.text, 0xFFFF);
     }
     
-    public static function fromErrorCode( code:Number
-                                        , errorMessage:String=null) 
-                                        : StreamErrorEvent {
-      var message:String;
+    internal static function fromHandshakeError(flag:Number) : StreamErrorEvent {
+      var code:Number;
+      var msg:String;
       
-      switch (code) {
-        default:
-        case 0x01: message = "Unknown Error"; break;
-
-        // Socket related error codes (also related to handshakes)
-        case 0x02: message = "Bad message format"; break;
-        case 0x03: message = "Multiple ACK request to same addr"; break;
-        case 0x04: message = "Invalid operator"; break;
-        case 0x05: message = "Invalid operator flag"; break;
-        case 0x06: message = "Stream is already open"; break;
-        case 0x07: message = "Stream is not writable"; break;
-        case 0x08: message = "Stream is not available"; break;
-        case 0x09: message = "Server is busy"; break;
-        case 0x0A: message = "Bad handshake packet"; break;
-        case 0x0F: message = "Invalid domain addr"; break;
-        
-        // Handshake related error codes
-        case 0x10: message = "Server is busy"; break;
-        case 0x12: message = "Invalid Domain"; break;
-        
-        // OPENRESP releated error codes
-        case 0x102: message = "Stream is not available"; break;
-				case 0x103: message = "Protocol not allowed"; break;
-				case 0x104: message = "Unauthorized"; break;
-        case 0x10F: message = ""; break; // User-defined
-
-        // Stream releated error end codes
-        case 0x111: message = "End of transmission"; break;
-        case 0x11F: message = ""; break; // User-defined.
-        
-        // Library specific error codes
-        case 0x1001: message = "Server responed with bad handshake"; break
-        case 0x1002: message = "Server sent malformed packet"; break
-        case 0x1003: message = "Server sent invalid open response"; break
-        case 0x1004: message = "Server sent to non-open stream"; break
-        case 0x1005: message = "Server redirected to open stream"; break
-        case 0x1006: message = "Security error"; break;
-        case 0x1007: message = "Stream already open."; break;
-        case 0x100F: message = "Disconnected from server"; break
+      switch (flag) {
+        case Packet.HANDSHAKE_UNKNOWN:
+          code = Packet.HANDSHAKE_UNKNOWN;
+          msg = "Unknown handshake error";
+          break;
+        case Packet.HANDSHAKE_SERVER_BUSY:
+          msg = "Handshake failed, server is busy";
+          break;
+        case Packet.HANDSHAKE_BADFORMAT:
+          msg = "Handshake failed, bad format sent by client";
+          break;
+        case Packet.HANDSHAKE_ZONE:
+          msg = "Handshake failed, invalid zone";
+          break;
       }
       
-      return new StreamErrorEvent(errorMessage || message, code);
+      return new StreamErrorEvent(msg, code);
+    }
+    
+    internal static function fromOpenError( flag:Number
+                                          , data:ByteArray
+                                          ) : StreamErrorEvent {
+      var code:Number;
+      var msg:String;
+      
+      code = flag;
+      
+      if (data != null || data.length != 0) {
+        msg = data.readUTFBytes(data.length);
+      }
+
+      switch (code) {
+        case Packet.OPEN_FAIL_NA:
+          msg = msg || "Failed to open stream, not available";
+          break;
+        case Packet.OPEN_FAIL_MODE:
+          msg = msg || "Not allowed to open stream with specified mode";
+          break;
+        case Packet.OPEN_FAIL_PROTOCOL:
+          msg = msg || "Not allowed to open stream with specified protocol";
+          break;
+        case Packet.OPEN_FAIL_HOST:
+          msg = msg || "Not allowed to open stream from host";
+          break;
+        case Packet.OPEN_FAIL_AUTH:
+          msg = msg || "Not allowed to open stream with credentials";
+          break;
+        case Packet.OPEN_FAIL_SERVICE_NA:
+          msg = msg || "Failed to open stream, service is not available";
+          break;
+        case Packet.OPEN_FAIL_SERVICE_ERR:
+          msg = msg || "Failed to open stream, service error";
+          break;
+        
+        default:
+        case Packet.OPEN_FAIL_OTHER:
+          code = Packet.OPEN_FAIL_OTHER;
+          msg = msg || "Failed to open stream, unknown error";
+          break;
+      }
+      
+      return new StreamErrorEvent(msg, code);
+    }
+    
+    internal static function fromSigError( flag:Number
+                                         , data:ByteArray
+                                         ) :  StreamErrorEvent {
+      var code:Number;
+      var msg:String;
+      
+      code = flag;
+      
+      if (data != null || data.length != 0) {
+        msg = data.readUTFBytes(data.length);
+      }
+      
+      switch (code) {
+        case Packet.SIG_ERR_PROTOCOL:
+          msg = msg || "Protocol error";
+          break;
+        case Packet.SIG_ERR_OPERATION:
+          msg = msg || "Operational error";
+          break;
+        case Packet.SIG_ERR_LIMIT:
+          msg = msg || "Limit error";
+          break;
+        case Packet.SIG_ERR_SERVER:
+          msg = msg || "Server error";
+          break;
+        case Packet.SIG_ERR_VIOLATION:
+          msg = msg || "Violation error";
+          break;
+        
+        default:
+        case Packet.SIG_ERR_OTHER:
+          code = Packet.SIG_ERR_OTHER;
+          msg = msg || "Unknown error";
+          break;
+      }
+      
+      return new StreamErrorEvent(msg, code);
     }
   }
 }

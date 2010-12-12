@@ -39,6 +39,8 @@ package hydna.net {
     
     public static var NULLADDR:Addr;
     
+    internal static const BROADCAST_ADDR:Number = 0;
+    
     private static const ADDR_SIZE:Number = 8;
     private static const COMP_SIZE:Number = 4;
     

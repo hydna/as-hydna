@@ -43,7 +43,7 @@ package hydna.net {
   import hydna.net.Addr;
   import hydna.net.StreamErrorEvent;
   import hydna.net.StreamDataEvent;
-  import hydna.net.StreamSignalEvent;
+  import hydna.net.StreamEmitEvent;
   import hydna.net.Stream;
   import hydna.net.StreamMode;
 
@@ -132,7 +132,7 @@ package hydna.net {
                            , tokenOffset:uint=0
                            , tokenLength:uint=0) : void {
       var addr:Addr;
-      var message:Message;
+      var packet:Packet;
       var request:OpenRequest;
       
       if (_socket) {
@@ -156,10 +156,10 @@ package hydna.net {
       // Ref count
       _socket.allocStream();
       
-      message = new Message(_addr, Message.OPEN, mode,
-                            token, tokenOffset, tokenLength);
+      packet = new Packet( _addr, Packet.OPEN, mode
+                         , token, tokenOffset, tokenLength);
       
-      request = new OpenRequest(this, _addr, message);
+      request = new OpenRequest(this, _addr, packet);
       
       if (_socket.requestOpen(request) == false) {
         throw new Error("Stream already open");
@@ -185,7 +185,7 @@ package hydna.net {
                               , offset:uint=0
                               , length:uint=0
                               , priority:uint=0) : void {
-      var message:Message;
+      var packet:Packet;
 
       if (connected == false || _socket == null) {
         throw new IOError("Stream is not connected.");
@@ -198,12 +198,11 @@ package hydna.net {
       if (priority > 3) {
         throw new RangeError("Priority must be between 0 - 3");
       }
-      
-      message = new Message(_addr, Message.DATA, priority,
-                            data, offset, length);
+            
+      packet = new Packet( _addr, Packet.DATA, priority
+                         , data, offset, length);
 
-
-      _socket.writeBytes(message);
+      _socket.writeBytes(packet);
       _socket.flush();
     }
     
@@ -243,9 +242,8 @@ package hydna.net {
      */
     public function emit( data:ByteArray
                               , offset:uint=0
-                              , length:uint=0
-                              , type:uint=0) : void {
-      var message:Message;
+                              , length:uint=0) : void {
+      var packet:Packet;
                                 
       if (connected == false || _socket == null) {
         throw new IOError("Stream is not connected.");
@@ -255,10 +253,10 @@ package hydna.net {
         throw new Error("You do not have permission to send signals");
       }
 
-      message = new Message(_addr, Message.SIGNAL, type,
-                            data, offset, length);
+      packet = new Packet( _addr, Packet.SIGNAL, Packet.SIG_EMIT
+                         , data, offset, length);
 
-      _socket.writeBytes(message);
+      _socket.writeBytes(packet);
       _socket.flush();
     }
 
@@ -276,8 +274,10 @@ package hydna.net {
     
     /**
      *  Closes the Stream instance.
+     *
+     *  @param message An optional message to send with the close signal.
      */
-    public function close() : void {
+    public function close(message:String=null) : void {
       if (_socket == null || _pendingClose == true) return;
       
       if (_openRequest != null) {
@@ -288,7 +288,7 @@ package hydna.net {
           _pendingClose = true;
         }
       } else {
-        internalClose();
+        internalClose(message);
       }
     }
     
@@ -324,18 +324,24 @@ package hydna.net {
     }
     
     // Internally close stream
-    private function internalClose() : void {
+    private function internalClose(message:String=null) : void {
       var event:Event = null;
-      var message:Message;
+      var packet:Packet;
+      var payload:ByteArray;
       
-      message = new Message(_addr, Message.CLOSE);
+      if (message != null) {
+        payload = new ByteArray();
+        payload.writeUTFBytes(message);
+      }
+      
+      packet = new Packet(_addr, Packet.SIGNAL, Packet.SIG_END, payload);
 
       if (_socket && _socket.handshaked) {
         try {
-          _socket.writeBytes(message);
+          _socket.writeBytes(packet);
           _socket.flush();
         } catch (error:IOErrorEvent) {
-          // Something wen't terrible wrong. Queue message and wait 
+          // Something wen't terrible wrong. Queue packet and wait 
           // for a reconnect.
           event = error;
         }

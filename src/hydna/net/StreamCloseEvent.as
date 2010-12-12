@@ -1,4 +1,4 @@
-// StreamDataEvent.as
+// HydnaSignalEvent.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -35,28 +35,25 @@ package hydna.net {
   import flash.events.Event;
   import flash.utils.ByteArray;
   
-  public class StreamDataEvent extends Event {
+  public class StreamCloseEvent extends Event {
     
-    public static const DATA:String = "data";
+    public static const CLOSE:String = "close";
     
-    private var _data:ByteArray;
-    private var _priority:Number
+    private var _message:String = null;
     
-    public function StreamDataEvent(priority:Number, data:ByteArray) {
-      super(DATA, false, false);
-      _data = data;
-      _priority = priority;
+    public function StreamCloseEvent(data:ByteArray) {
+      super(CLOSE, false, false);
+      
+      if (data != null || data.length != 0) {
+        _message = data.readUTFBytes(data.length);
+      }
     }
     
     /**
-     *  Returns the data associated with this StreamDataEvent instance.
+     *  Returns the message associated with this StreamCloseEvent instance.
      */
-    public function get data() : ByteArray {
-      return _data;
-    }
-    
-    public function get priority() : Number {
-      return _priority;
+    public function get message() : String {
+      return _message;
     }
     
   }

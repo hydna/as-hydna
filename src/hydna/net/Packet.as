@@ -1,4 +1,4 @@
-// Message.as
+// Packet.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -37,20 +37,47 @@ package hydna.net {
   
   import hydna.net.Addr;
   
-  internal class Message extends ByteArray {
+  internal class Packet extends ByteArray {
     
     internal static const HEADER_SIZE:Number = 0x08;
     
     // Opcodes
-    internal static const OPEN:Number =  0x01;
-    internal static const OPENRESP:Number = 0x01;
-    internal static const CLOSE:Number =  0x02;
-    internal static const DATA:Number = 0x03;
-    internal static const SIGNAL:Number = 0x04;
-    internal static const END:Number = 0x0F;
+    internal static const OPEN:Number = 0x01;
+    internal static const DATA:Number = 0x02;
+    internal static const SIGNAL:Number = 0x03;
     
+    // Handshake flags
+    internal static const HANDSHAKE_UNKNOWN:Number = 0x01;
+    internal static const HANDSHAKE_SERVER_BUSY:Number = 0x02;
+    internal static const HANDSHAKE_BADFORMAT:Number = 0x03;
+    internal static const HANDSHAKE_ZONE:Number = 0x04;
 
-    public function Message( addr:Addr
+    // Open Flags
+    internal static const OPEN_SUCCESS:Number = 0x0;
+    internal static const OPEN_REDIRECT:Number = 0x1;
+    internal static const OPEN_FAIL_NA:Number = 0x8;
+    internal static const OPEN_FAIL_MODE:Number = 0x9;
+    internal static const OPEN_FAIL_PROTOCOL:Number = 0xa;
+    internal static const OPEN_FAIL_HOST:Number = 0xb;
+    internal static const OPEN_FAIL_AUTH:Number = 0xc;
+    internal static const OPEN_FAIL_SERVICE_NA:Number = 0xd;
+    internal static const OPEN_FAIL_SERVICE_ERR:Number = 0xe;
+    internal static const OPEN_FAIL_OTHER:Number = 0xf;
+
+    // Signal Flags
+    internal static const SIG_EMIT:Number = 0x0;
+    internal static const SIG_END:Number = 0x1;
+    internal static const SIG_ERR_PROTOCOL:Number = 0xa;
+    internal static const SIG_ERR_OPERATION:Number = 0xb;
+    internal static const SIG_ERR_LIMIT:Number = 0xc;
+    internal static const SIG_ERR_SERVER:Number = 0xd;
+    internal static const SIG_ERR_VIOLATION:Number = 0xe;
+    internal static const SIG_ERR_OTHER:Number = 0xf;
+    
+    // Upper payload limit (10kb)
+    internal static const PAYLOAD_MAX_LIMIT:Number = 10 * 1024;
+
+    public function Packet( addr:Addr
                            , op:uint
                            , flag:uint=0
                            , payload:ByteArray=null
@@ -74,7 +101,11 @@ package hydna.net {
       } else if (fixedOffset + fixedLength > payload.length) {
         fixedOffset = 0;
         fixedLength = payload.length;
-      } 
+      }
+      
+      if (fixedLength > PAYLOAD_MAX_LIMIT) {
+        throw new RangeError("Payload max limit reached.");
+      }
       
       writeShort(fixedLength + HEADER_SIZE);
       writeByte(0); // Reserved

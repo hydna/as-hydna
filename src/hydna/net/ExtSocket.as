@@ -42,12 +42,13 @@ package hydna.net {
   import flash.utils.Dictionary;
   
   import hydna.net.Addr;
-  import hydna.net.Message;
   import hydna.net.OpenRequest;
+  import hydna.net.Packet;
   import hydna.net.Stream;
   import hydna.net.StreamDataEvent;
   import hydna.net.StreamErrorEvent;
-  import hydna.net.StreamSignalEvent;
+  import hydna.net.StreamEmitEvent;
+  import hydna.net.StreamCloseEvent;
   
   // Internal wrapper around flash.net.Socket
   internal class ExtSocket extends Socket {
@@ -160,10 +161,11 @@ package hydna.net {
         _pendingOpenRequests[streamcomp] = request;
         if (!_connecting) {
           _connecting = true;
+          trace("Connect to " + request.addr.host + ":" + request.addr.port);
           connect(request.addr.host, request.addr.port);
         }
       } else {
-        writeBytes(request.message);
+        writeBytes(request.packet);
         request.sent = true;
 
         try {
@@ -237,7 +239,8 @@ package hydna.net {
     private function handshakeHandler(event:ProgressEvent) : void {
       var sentRequestCount:Number = 0;
       var request:OpenRequest;
-      var responseCode:Number;
+      var code:Number;
+      var errevent:Event;
       
 trace("incomming handshake response");
       readBytes(_receiveBuffer, _receiveBuffer.length, bytesAvailable);
@@ -246,18 +249,21 @@ trace("incomming handshake response");
 trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE);
         return;
       } else if (_receiveBuffer.length > HANDSHAKE_RESP_SIZE) {
-        dispatchEvent(StreamErrorEvent.fromErrorCode(0x1001));
+        errevent = new StreamErrorEvent("Server responed with bad handshake");
+        dispatchEvent(event);
         return;
       }
       
       if (_receiveBuffer.readMultiByte(HANDSHAKE_RESP_SIZE - 1, "us-acii") 
           !== "DNA1") {
-        dispatchEvent(StreamErrorEvent.fromErrorCode(0x1001));
+        errevent = new StreamErrorEvent("Server responed with bad handshake");
+        dispatchEvent(event);
         return;
       }
       
-      if ((responseCode = _receiveBuffer.readByte()) > 0) {
-        dispatchEvent(StreamErrorEvent.fromErrorCode(responseCode));
+      if ((code = _receiveBuffer.readByte()) > 0) {
+        errevent = StreamErrorEvent.fromHandshakeError(code);
+        dispatchEvent(event);
         return;
       }
 
@@ -270,7 +276,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
 
       for (var key:Object in _pendingOpenRequests) {
         request = OpenRequest(_pendingOpenRequests[key]);
-        writeBytes(request.message);
+        writeBytes(request.packet);
         request.sent = true;
         trace("send open request")
       }
@@ -295,12 +301,12 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
       
       readBytes(_receiveBuffer, _receiveBuffer.length, bytesAvailable);
 
-      while (_receiveBuffer.bytesAvailable > Message.HEADER_SIZE) {
-        
+      while (_receiveBuffer.bytesAvailable >= Packet.HEADER_SIZE) {
         size = _receiveBuffer.readUnsignedShort();
 
         if (_receiveBuffer.bytesAvailable < (size - 2)) {
           _receiveBuffer.position -= 2;
+          trace("return!");
           return;
         }
 
@@ -309,29 +315,28 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
         op = _receiveBuffer.readUnsignedByte();
         flag = (op & 0xf);
         
-        if (size - Message.HEADER_SIZE) {
+        if (size - Packet.HEADER_SIZE) {
           payload = new ByteArray();
-          _receiveBuffer.readBytes(payload, 0, size - Message.HEADER_SIZE);
+          _receiveBuffer.readBytes(payload, 0, size - Packet.HEADER_SIZE);
         }
+        
+        trace("incomming op: " + (op >> 4));
         
         switch ((op >> 4)) {
 
-          case Message.OPENRESP:
+          case Packet.OPEN:
             trace("open response");
-            processOpenRespMessage(addr, flag, payload);
+            processOpenPacket(addr, flag, payload);
             break;
             
-          case Message.DATA:
-            processDataMessage(addr, flag, payload);
+          case Packet.DATA:
+            trace("incomming data");
+            processDataPacket(addr, flag, payload);
             break;
             
-          case Message.SIGNAL:
-            processSignalMessage(addr, flag, payload);
+          case Packet.SIGNAL:
+            processSignalPacket(addr, flag, payload);
             break;
-
-          case Message.END:
-            processEndMessage(addr, flag, payload);
-            return;
         }
       }
       
@@ -340,66 +345,78 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
       }
     }
 
-    // process a open response message
-    private function processOpenRespMessage( addr:uint
-                                           , errcode:Number
-                                           , payload:ByteArray) : void {
+    // process an open packet
+    private function processOpenPacket( addr:uint
+                                      , flag:Number
+                                      , payload:ByteArray) : void {
       var request:OpenRequest;
       var stream:Stream;
-      var respaddr:uint;
+      var redirectaddr:uint;
       var event:Event;
 
       request = OpenRequest(_pendingOpenRequests[addr]);
       
       if (request == null) {
-        destroy(StreamErrorEvent.fromErrorCode(0x1003));
+        event = new StreamErrorEvent("Server sent invalid open packet");
+        destroy(event);
         return;
       }
 
       stream = request.stream;
-
-      if (errcode == SUCCESS) {
-        
-        if (payload == null || payload.length < 4) {
-          destroy(StreamErrorEvent.fromErrorCode(0x1002));
-          return;
-        }
-
-        respaddr = payload.readUnsignedInt();
-        
-        trace("inaddr: " + addr);
-        trace("respaddr: " + respaddr);
-        
-        if (_openStreams[respaddr]) {
-          destroy(StreamErrorEvent.fromErrorCode(0x1005));
-          return;
-        }
-        
-        _openStreams[respaddr] = stream;
-        
-        stream.openSuccess(new Addr(request.addr.zone, respaddr));
-        
-      } else {
-        
-        if (errcode == CUSTOM_ERR_CODE && payload != null && payload.length) {
-          event = StreamErrorEvent.fromErrorCode(0x100 + errcode, 
-                                      payload.readUTFBytes(payload.length))
-        } else {
-          event = StreamErrorEvent.fromErrorCode(0x100 + errcode);
-        }
-        
-        stream.dispatchEvent(event);
-      }
       
+      switch (flag) {
+
+        case Packet.OPEN_SUCCESS:
+          _openStreams[addr] = stream;
+          stream.openSuccess(request.addr);
+          break;
+          
+        case Packet.OPEN_REDIRECT:
+          
+          if (payload == null || payload.length < 4) {
+            destroy(new StreamErrorEvent("Expected redirect addr from server"));
+            return;
+          }
+          
+          redirectaddr = payload.readUnsignedInt();
+          
+          if (_openStreams[redirectaddr]) {
+            destroy(new StreamErrorEvent("Server redirected to open stream"));
+            return;
+          }
+          
+          _openStreams[redirectaddr] = stream;
+          stream.openSuccess(new Addr(request.addr.zone, redirectaddr));
+          break;
+          
+        case Packet.OPEN_FAIL_NA:
+        case Packet.OPEN_FAIL_MODE:
+        case Packet.OPEN_FAIL_PROTOCOL:
+        case Packet.OPEN_FAIL_HOST:
+        case Packet.OPEN_FAIL_AUTH:
+        case Packet.OPEN_FAIL_SERVICE_NA:
+        case Packet.OPEN_FAIL_SERVICE_ERR:
+        case Packet.OPEN_FAIL_OTHER:
+          event = StreamErrorEvent.fromOpenError(flag, payload);
+          stream.destroy(event);
+          break;
+
+        default:
+          destroy(new StreamErrorEvent("Server sent an unknown packet flag"));
+          return;
+      }
+
       if (_openWaitQueue[addr] && _openWaitQueue[addr].length) {
         
         // Destroy all pending request IF response wasn't a 
         // redirected stream.
-        if (errcode == SUCCESS && respaddr == addr) {
+        if (flag == Packet.OPEN_REDIRECT && redirectaddr == addr) {
           delete _pendingOpenRequests[addr];
           
+          event = new StreamErrorEvent("Stream already open");
+          
           while ((request = OpenRequest(_openWaitQueue[addr].pop()))) {
-            request.stream.destroy(StreamErrorEvent.fromErrorCode(0x1007));
+            request.stream.destroy(event);
           }
           return;
         }
@@ -411,7 +428,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
           delete _openWaitQueue[addr];
         }
         
-        writeBytes(request.message);
+        writeBytes(request.packet);
         request.sent = true;
         
         try {
@@ -426,70 +443,120 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
                                         
     }
     
-    // process a data message
-    private function processDataMessage( addr:uint
-                                       , priority:Number
-                                       , payload:ByteArray) : void {
-      var stream:Stream;                                  
-
-      stream = Stream(_openStreams[addr]);
-
-      if (stream == null || payload == null || payload.length == 0) {
-        destroy(StreamErrorEvent.fromErrorCode(0x1004))
-      }
-
-      stream.dispatchEvent(new StreamDataEvent(priority, payload));
-    }
-
-    // process a signal message
-    private function processSignalMessage( addr:uint
-                                         , type:Number
-                                         , payload:ByteArray) : void {
-      var stream:Stream;                                  
-      
-      stream = Stream(_openStreams[addr]);
-      
-      if (stream == null || payload == null || payload.length == 0) {
-        destroy(StreamErrorEvent.fromErrorCode(0x1004))
-      }
-      
-      stream.dispatchEvent(new StreamSignalEvent(type, payload));
-    }
-
-    // process an end message
-    private function processEndMessage( addr:uint
-                                       , errcode:Number
-                                       , payload:ByteArray) : void {
+    // process a data packet
+    private function processDataPacket( addr:uint
+                                      , flag:Number
+                                      , payload:ByteArray) : void {
       var stream:Stream;
       var event:Event;
-			var erroff:Number = addr == 0 ? 0 : 0x100;
 
-			if (errcode == 0) {
-				event = new Event(Event.CLOSE);
-			} else {
-				
-				if (errcode == CUSTOM_ERR_CODE && payload != null && payload.length) {
-	        event = StreamErrorEvent.fromErrorCode(erroff + errcode, 
-	                   										payload.readUTFBytes(payload.length));
-	      } else {
-	        event = StreamErrorEvent.fromErrorCode(erroff + errcode);
-	      }
-			}
+      if (payload == null || payload.length == 0) {
+        destroy(new StreamErrorEvent("Zero data packet sent received"));
+        return;
+      }
       
-      // Global error?
-      if (addr == 0) {
-        destroy(event);
+      if (addr == Addr.BROADCAST_ADDR) {
+        for (var key:String in _openStreams) {
+          event = new StreamDataEvent(flag, payload);
+          stream = Stream(_openStreams[key]);
+          stream.dispatchEvent(event);
+        }
       } else {
         stream = Stream(_openStreams[addr]);
 
-        if (stream != null) {
-          stream.destroy(event);
+        if (stream == null) {
+          destroy(new StreamErrorEvent("Packet sent to unknown stream"));
+          return;
         }
+        
+        event = new StreamDataEvent(flag, payload);
+
+        stream.dispatchEvent(event);
       }
+    }
+
+    // process a signal packet
+    private function processSignalPacket( addr:uint
+                                        , flag:Number
+                                        , payload:ByteArray) : void {
+      var stream:Stream;
+      var event:Event;
+      
+      switch (flag) {
+        
+        case Packet.SIG_EMIT:
+        
+          if (addr == Addr.BROADCAST_ADDR) {
+            for (var key:String in _openStreams) {
+              event = new StreamEmitEvent(payload);
+              stream = Stream(_openStreams[key]);
+              stream.dispatchEvent(event);
+            }
+          } else {
+            event = new StreamEmitEvent(payload);
+            
+            stream = Stream(_openStreams[addr]);
+
+            if (stream == null) {
+              destroy(new StreamErrorEvent("Packet sent to unknown stream"));
+              return;
+            }
+
+            stream.dispatchEvent(event);
+          }
+          break;
+          
+        case Packet.SIG_END:
+
+          event = new StreamCloseEvent(payload);
+          
+          if (addr == Addr.BROADCAST_ADDR) {
+            destroy(event);
+          } else {
+            stream = Stream(_openStreams[addr]);
+
+            if (stream == null) {
+              destroy(new StreamErrorEvent("Packet sent to unknown stream"));
+              return;
+            }
+            
+            stream.destroy(event);
+          }
+          break;
+          
+        case Packet.SIG_ERR_PROTOCOL:
+        case Packet.SIG_ERR_OPERATION:
+        case Packet.SIG_ERR_LIMIT:
+        case Packet.SIG_ERR_SERVER:
+        case Packet.SIG_ERR_VIOLATION:
+        case Packet.SIG_ERR_OTHER:
+
+          event = StreamErrorEvent.fromSigError(flag, payload);
+          
+          if (addr == Addr.BROADCAST_ADDR) {
+            destroy(event);
+          } else {
+            stream = Stream(_openStreams[addr]);
+
+            if (stream == null) {
+              destroy(new StreamErrorEvent("Packet sent to unknown stream"));
+              return;
+            }
+            
+            stream.destroy(event);
+          }
+          break;
+          
+        default:
+          destroy(new StreamErrorEvent("Server sent an unknown packet flag"));
+          break;
+        
+      }
+      
     }
     
     private function securityErrorHandler(event:SecurityErrorEvent) : void {
-      destroy(StreamErrorEvent.fromErrorCode(0x1006));
+      destroy(new StreamErrorEvent("Security error"));
     }
 
     // Handles socket errors
@@ -499,7 +566,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
 
     // Handles socket close
     private function closeHandler(event:Event) : void {
-      destroy(StreamErrorEvent.fromErrorCode(0x100F));
+      destroy(new StreamErrorEvent("Disconnected from server"));
     }
     
     // Finalize the Socket
@@ -529,7 +596,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
 			_openStreams = null;
       
       if (event == null) {
-        event = StreamErrorEvent.fromErrorCode(0x01);
+        event = new StreamErrorEvent("Unknown error");
       }
 
 			if (pending != null) {
