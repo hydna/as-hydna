@@ -51,7 +51,7 @@ package {
    */
   public class HelloWorld extends Sprite {
 
-    public static const ADDRESS:String = "00112233-00112233";
+    public static const ADDRESS:String = "localhost:7010/x00112233";
     
     public function HelloWorld() {
       var stream:Stream;

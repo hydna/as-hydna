@@ -78,8 +78,14 @@ package hydna.net {
         case Packet.HANDSHAKE_BADFORMAT:
           msg = "Handshake failed, bad format sent by client";
           break;
-        case Packet.HANDSHAKE_ZONE:
-          msg = "Handshake failed, invalid zone";
+        case Packet.HANDSHAKE_HOSTNAME:
+          msg = "Handshake failed, invalid hostname";
+          break;
+        case Packet.HANDSHAKE_PROTOCOL:
+          msg = "Handshake failed, protocol not allowed";
+          break;
+        case Packet.HANDSHAKE_SERVER_ERROR:
+          msg = "Handshake failed, server error";
           break;
       }
       

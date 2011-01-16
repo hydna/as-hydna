@@ -41,7 +41,6 @@ package hydna.net {
   import flash.utils.ByteArray;
   import flash.utils.Dictionary;
   
-  import hydna.net.Addr;
   import hydna.net.OpenRequest;
   import hydna.net.Packet;
   import hydna.net.Stream;
@@ -52,6 +51,8 @@ package hydna.net {
   
   // Internal wrapper around flash.net.Socket
   internal class ExtSocket extends Socket {
+	
+	  private static const BROADCAST_ADDR:Number = 0;
 
     private static const HANDSHAKE_SIZE:Number = 8;
     private static const HANDSHAKE_RESP_SIZE:Number = 5;
@@ -65,7 +66,9 @@ package hydna.net {
     private var _handshaked:Boolean = false;
 
     private var _receiveBuffer:ByteArray;
-    private var _zone:uint;
+    private var _uri:String;
+		private var _host:String;
+		private var _port:Number;
 
     private var _pendingOpenRequests:Dictionary;
     private var _openStreams:Dictionary;
@@ -78,14 +81,15 @@ package hydna.net {
     }
     
     // Return an available socket or create a new one.
-    internal static function getSocket(addr:Addr) : ExtSocket {
+    internal static function getSocket(host:String, port:Number) : ExtSocket {
+			var uri:String = "hydna:" + host + ":" + port;
       var socket:ExtSocket;
       
-      if (availableSockets[addr.zone]) {
-        socket = availableSockets[addr.zone];
+      if (availableSockets[uri]) {
+        socket = availableSockets[uri];
       } else {
-        socket = new ExtSocket(addr.zone);
-        availableSockets[addr.zone] = socket;
+        socket = new ExtSocket(uri, host, port);
+        availableSockets[uri] = socket;
       }
       
       return socket;
@@ -94,10 +98,12 @@ package hydna.net {
     /**
      *  Initializes a new Stream instance
      */
-    public function ExtSocket(zoneid:uint) {
+    public function ExtSocket(uri:String, host:String, port:Number) {
       super();
 
-      _zone = zoneid;
+      _uri = uri;
+			_host = host;
+			_port = port;
       
       _receiveBuffer = new ByteArray();
 
@@ -110,6 +116,10 @@ package hydna.net {
       addEventListener(IOErrorEvent.IO_ERROR, errorHandler);
       addEventListener(SecurityErrorEvent.SECURITY_ERROR, 
                        securityErrorHandler);
+    }
+
+    internal function get uri() : String {
+      return _uri;
     }
     
     internal function get handshaked() : Boolean {
@@ -124,11 +134,11 @@ package hydna.net {
     }
     
     // Decrease the reference count
-    internal function deallocStream(addr:Addr=null) : void {
+    internal function deallocStream(addr:uint=0) : void {
       trace("deallocStream: - > ")
-      if (addr != null) {
-        trace("deallocStream: - > delete stream of addr: " + addr.stream);
-        delete _openStreams[addr.stream];
+      if (addr != 0) {
+        trace("deallocStream: - > delete stream of addr: " + addr);
+        delete _openStreams[addr];
       }
       
       if (--_streamRefCount == 0) {
@@ -140,29 +150,28 @@ package hydna.net {
     // Request to open a stream. Return true if request went well, else
     // false.
     internal function requestOpen(request:OpenRequest) : Boolean {
-      var streamcomp:uint = request.addr.stream;
+      var addr:uint = request.addr;
       var queue:Array;
 
-      if (_openStreams[streamcomp]) {
+      if (_openStreams[addr]) {
         return false;
       }
 
-      if (_pendingOpenRequests[streamcomp]) {
+      if (_pendingOpenRequests[addr]) {
         
-        queue = _openWaitQueue[streamcomp] as Array;
+        queue = _openWaitQueue[addr] as Array;
         
         if (!queue) {
-          _openWaitQueue[streamcomp] = queue = new Array();
+          _openWaitQueue[addr] = queue = new Array();
         } 
         
         queue.push(request);
         
       } else if (!_handshaked) {
-        _pendingOpenRequests[streamcomp] = request;
+        _pendingOpenRequests[addr] = request;
         if (!_connecting) {
           _connecting = true;
-          trace("Connect to " + request.addr.host + ":" + request.addr.port);
-          connect(request.addr.host, request.addr.port);
+          connect(_host, _port);
         }
       } else {
         writeBytes(request.packet);
@@ -182,7 +191,7 @@ package hydna.net {
     // Try to cancel an open request. Returns true on success else
     // false.
     internal function cancelOpen(request:OpenRequest) : Boolean {
-      var streamcomp:uint = request.addr.stream;
+      var addr:uint = request.addr;
       var queue:Array;
       var index:Number;
       
@@ -190,13 +199,13 @@ package hydna.net {
         return false;
       }
       
-      queue = _openWaitQueue[streamcomp] as Array;
+      queue = _openWaitQueue[addr] as Array;
       
-      if (_pendingOpenRequests[streamcomp]) {
-        delete _pendingOpenRequests[streamcomp];
+      if (_pendingOpenRequests[addr]) {
+        delete _pendingOpenRequests[addr];
         
         if (queue != null && queue.length)  {
-          _pendingOpenRequests[streamcomp] = queue.pop();
+          _pendingOpenRequests[addr] = queue.pop();
         }
         
         return true;
@@ -226,7 +235,8 @@ package hydna.net {
       addEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
 
       writeMultiByte("DNA1", "us-acii");
-      writeUnsignedInt(_zone);
+			writeByte(_host.length);
+			writeMultiByte(_host, "us-ascii");
       
       try {
         flush();
@@ -386,7 +396,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
           }
           
           _openStreams[redirectaddr] = stream;
-          stream.openSuccess(new Addr(request.addr.zone, redirectaddr));
+          stream.openSuccess(redirectaddr);
           break;
           
         case Packet.OPEN_FAIL_NA:
@@ -455,7 +465,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
         return;
       }
       
-      if (addr == Addr.BROADCAST_ADDR) {
+      if (addr == BROADCAST_ADDR) {
         for (var key:String in _openStreams) {
           event = new StreamDataEvent(flag, payload);
           stream = Stream(_openStreams[key]);
@@ -486,7 +496,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
         
         case Packet.SIG_EMIT:
         
-          if (addr == Addr.BROADCAST_ADDR) {
+          if (addr == BROADCAST_ADDR) {
             for (var key:String in _openStreams) {
               event = new StreamEmitEvent(payload);
               stream = Stream(_openStreams[key]);
@@ -510,7 +520,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
 
           event = new StreamCloseEvent(payload);
           
-          if (addr == Addr.BROADCAST_ADDR) {
+          if (addr == BROADCAST_ADDR) {
             destroy(event);
           } else {
             stream = Stream(_openStreams[addr]);
@@ -533,7 +543,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
 
           event = StreamErrorEvent.fromSigError(flag, payload);
           
-          if (addr == Addr.BROADCAST_ADDR) {
+          if (addr == BROADCAST_ADDR) {
             destroy(event);
           } else {
             stream = Stream(_openStreams[addr]);
@@ -627,8 +637,8 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
       }
       
       
-			if (availableSockets[_zone]) {
-      	delete availableSockets[_zone];
+			if (availableSockets[_uri]) {
+      	delete availableSockets[_uri];
 			}
 
       trace("destroy: done");

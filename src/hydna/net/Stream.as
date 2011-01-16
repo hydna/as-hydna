@@ -40,7 +40,6 @@ package hydna.net {
   import flash.utils.ByteArray;
   import flash.utils.Dictionary;
   
-  import hydna.net.Addr;
   import hydna.net.StreamErrorEvent;
   import hydna.net.StreamDataEvent;
   import hydna.net.StreamEmitEvent;
@@ -48,8 +47,13 @@ package hydna.net {
   import hydna.net.StreamMode;
 
   public class Stream extends EventDispatcher {
+	
+		private static const DEFAULT_PORT:Number = 7010;
+		private static const URI_RE:RegExp = /(?:hydna:){0,1}([\w\-\.]+)(?::(\d+)){0,1}(?:\/(\d+|x[a-fA-F0-9]+){0,1}){0,1}(?:\?(.+)){0,1}/;
     
-    private var _addr:Addr = null;
+    private var _addr:uint = 0;
+		private var _uri:String = null;
+		private var _token:String = null;
 
     private var _socket:ExtSocket = null;
     private var _connected:Boolean = false;
@@ -99,16 +103,30 @@ package hydna.net {
     }
     
     /**
-     *  Returns the HydnaAddr that this instance listen to.
+     *  Returns the addr that this instance listen to.
      *
-     *  @return {HydnaAddr} the specified HydnaAddr instance.
+     *  @return {Number} the specified addr number.
      */
-    public function get addr() : Addr {
+    public function get addr() : Number {
       return _addr;
     }
+
+    /**
+     *  Returns the url for this instance.
+     *
+     *  @return {String} the specified hostname.
+     */
+		public function get uri() : String {
+			
+			if (!_uri) {
+				_uri = _socket.uri + "/" + _addr + (_token ? "?" + _token : "");
+			}
+			
+			return _uri;
+		}
     
     /**
-     *  Connects the stream to the specified addr. If the connection fails 
+     *  Connects the stream to the specified uri. If the connection fails 
      *  immediately, either an event is dispatched or an exception is thrown: 
      *  an error event is dispatched if a host was specified, and an exception
      *  is thrown if no host was specified. Otherwise, the status of the 
@@ -126,21 +144,73 @@ package hydna.net {
      *  in the application security sandbox. For more information, see the 
      *  "Flash Player Security" chapter in Programming ActionScript 3.0.
      */
-    public function connect( addrExpr:String
+    public function connect( uri:String
                            , mode:Number=StreamMode.READ
                            , token:ByteArray=null
                            , tokenOffset:uint=0
                            , tokenLength:uint=0) : void {
-      var addr:Addr;
+      var m:Array;
       var packet:Packet;
       var request:OpenRequest;
+			var tokenb:ByteArray = null;
+			var tokeno:uint = 0;
+			var tokenl:uint = 0;
+			var addr:Number;
+			var host:String;
+			var port:Number;
       
       if (_socket) {
         throw new Error("Already connected");
       }
+
+			if (uri == null) {
+				throw new Error("Expected `uri`");
+			}
+
+			m = URI_RE.exec(uri);
+			
+			host = m[1];
+			port = m[2] || DEFAULT_PORT;
+			
+			if (!host) {
+				throw new Error("Expected hostname");
+			}
+			
+			if (host.length > 256) {
+				throw new Error("Hostname must not exceed 256 characters");
+			}
+			
+			if (m[3]) {
+				if (m[3].charAt(0) == "x") {
+					addr = parseInt("0" + m[3]);
+				} else {
+					m[3] = parseInt(m[3]);
+				}
+			} else {
+				addr = 1;
+			}
+			
+			if (addr > 0xFFFFFFFF) {
+				throw new Error("Expected addr between x0 and xFFFFFFFF");
+			}
+			
+			if (token != null) {
+				tokenb = token;
+				tokeno = tokenOffset;
+				tokenl = tokenLength;
+			} else if (m[4]) {
+				tokenb = new ByteArray();
+				tokenb.writeMultiByte(decodeURIComponent(m[4]), "us-ascii");
+				tokeno = 0;
+				tokenl = tokenb.length;
+			}
+			
+			if (tokenb != null) {
+				_token = encodeURIComponent(
+									tokenb.readMultiByte(tokenb.length, "us-ascii"));
+				tokenb.position = 0;
+			}
       
-      _addr = Addr.fromExpr(addrExpr);
-                             
       if (mode < 0 || mode > StreamMode.READWRITE_EMIT) {
         throw new Error("Invalid stream mode");
       }
@@ -151,15 +221,14 @@ package hydna.net {
       _writable = ((_mode & StreamMode.WRITE) == StreamMode.WRITE);
       _emitable = ((_mode & StreamMode.EMIT) == StreamMode.EMIT);
       
-      _socket = ExtSocket.getSocket(_addr);
+      _socket = ExtSocket.getSocket(host, port);
       
       // Ref count
       _socket.allocStream();
       
-      packet = new Packet( _addr, Packet.OPEN, mode
-                         , token, tokenOffset, tokenLength);
+      packet = new Packet(addr, Packet.OPEN, mode, tokenb, tokeno, tokenl);
       
-      request = new OpenRequest(this, _addr, packet);
+      request = new OpenRequest(this, addr, packet);
       
       if (_socket.requestOpen(request) == false) {
         throw new Error("Stream already open");
@@ -293,7 +362,7 @@ package hydna.net {
     }
     
     // Internal callback for open success
-    internal function openSuccess(respaddr:Addr) : void {
+    internal function openSuccess(respaddr:uint) : void {
       _addr = respaddr;
       _connected = true;
       
@@ -315,7 +384,7 @@ package hydna.net {
         _socket.deallocStream(_connected ? _addr : null);
       }
 
-      _addr = null;
+      _addr = 0;
       _socket = null;
       
       if (event != null) {

@@ -35,8 +35,6 @@ package hydna.net {
   import flash.utils.ByteArray;
   import flash.utils.Endian;
   
-  import hydna.net.Addr;
-  
   internal class Packet extends ByteArray {
     
     internal static const HEADER_SIZE:Number = 0x08;
@@ -50,7 +48,9 @@ package hydna.net {
     internal static const HANDSHAKE_UNKNOWN:Number = 0x01;
     internal static const HANDSHAKE_SERVER_BUSY:Number = 0x02;
     internal static const HANDSHAKE_BADFORMAT:Number = 0x03;
-    internal static const HANDSHAKE_ZONE:Number = 0x04;
+    internal static const HANDSHAKE_HOSTNAME:Number = 0x04;
+    internal static const HANDSHAKE_PROTOCOL:Number = 0x05;
+    internal static const HANDSHAKE_SERVER_ERROR:Number = 0x06;
 
     // Open Flags
     internal static const OPEN_SUCCESS:Number = 0x0;
@@ -77,12 +77,12 @@ package hydna.net {
     // Upper payload limit (10kb)
     internal static const PAYLOAD_MAX_LIMIT:Number = 10 * 1024;
 
-    public function Packet( addr:Addr
-                           , op:uint
-                           , flag:uint=0
-                           , payload:ByteArray=null
-                           , offset:uint=0
-                           , length:uint=0) {
+    public function Packet( addr:uint
+                          , op:uint
+                          , flag:uint=0
+                          , payload:ByteArray=null
+                          , offset:uint=0
+                          , length:uint=0) {
       var fixedOffset:Number = offset;
       var fixedLength:Number = length;
       var payloadLength:Number;
@@ -109,7 +109,7 @@ package hydna.net {
       
       writeShort(fixedLength + HEADER_SIZE);
       writeByte(0); // Reserved
-      writeUnsignedInt(addr.stream);
+      writeUnsignedInt(addr);
       writeByte(op << 4 | flag);
       if (payload != null) {
         writeBytes(payload, fixedOffset, fixedLength);
