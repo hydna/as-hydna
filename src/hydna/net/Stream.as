@@ -48,12 +48,12 @@ package hydna.net {
 
   public class Stream extends EventDispatcher {
 	
-		private static const DEFAULT_PORT:Number = 7010;
-		private static const URI_RE:RegExp = /(?:hydna:){0,1}([\w\-\.]+)(?::(\d+)){0,1}(?:\/(\d+|x[a-fA-F0-9]+){0,1}){0,1}(?:\?(.+)){0,1}/;
+    private static const DEFAULT_PORT:Number = 7010;
+    private static const URI_RE:RegExp = /(?:hydna:){0,1}([\w\-\.]+)(?::(\d+)){0,1}(?:\/(\d+|x[a-fA-F0-9]+){0,1}){0,1}(?:\?(.+)){0,1}/;
     
     private var _addr:uint = 0;
-		private var _uri:String = null;
-		private var _token:String = null;
+    private var _uri:String = null;
+    private var _token:String = null;
 
     private var _socket:ExtSocket = null;
     private var _connected:Boolean = false;
@@ -116,13 +116,13 @@ package hydna.net {
      *
      *  @return {String} the specified hostname.
      */
-		public function get uri() : String {
+    public function get uri() : String {
+
+      if (!_uri) {
+        _uri = _socket.uri + "/" + _addr + (_token ? "?" + _token : "");
+      }
 			
-			if (!_uri) {
-				_uri = _socket.uri + "/" + _addr + (_token ? "?" + _token : "");
-			}
-			
-			return _uri;
+      return _uri;
 		}
     
     /**
@@ -152,64 +152,64 @@ package hydna.net {
       var m:Array;
       var packet:Packet;
       var request:OpenRequest;
-			var tokenb:ByteArray = null;
-			var tokeno:uint = 0;
-			var tokenl:uint = 0;
-			var addr:Number;
-			var host:String;
-			var port:Number;
+      var tokenb:ByteArray = null;
+      var tokeno:uint = 0;
+      var tokenl:uint = 0;
+      var addr:Number;
+      var host:String;
+      var port:Number;
       
       if (_socket) {
         throw new Error("Already connected");
       }
 
-			if (uri == null) {
-				throw new Error("Expected `uri`");
-			}
+      if (uri == null) {
+        throw new Error("Expected `uri`");
+      }
 
-			m = URI_RE.exec(uri);
-			
-			host = m[1];
-			port = m[2] || DEFAULT_PORT;
-			
-			if (!host) {
-				throw new Error("Expected hostname");
-			}
-			
-			if (host.length > 256) {
-				throw new Error("Hostname must not exceed 256 characters");
-			}
-			
-			if (m[3]) {
-				if (m[3].charAt(0) == "x") {
-					addr = parseInt("0" + m[3]);
-				} else {
-					m[3] = parseInt(m[3]);
-				}
-			} else {
-				addr = 1;
-			}
-			
-			if (addr > 0xFFFFFFFF) {
-				throw new Error("Expected addr between x0 and xFFFFFFFF");
-			}
-			
-			if (token != null) {
-				tokenb = token;
-				tokeno = tokenOffset;
-				tokenl = tokenLength;
-			} else if (m[4]) {
-				tokenb = new ByteArray();
-				tokenb.writeMultiByte(decodeURIComponent(m[4]), "us-ascii");
-				tokeno = 0;
-				tokenl = tokenb.length;
-			}
-			
-			if (tokenb != null) {
-				_token = encodeURIComponent(
-									tokenb.readMultiByte(tokenb.length, "us-ascii"));
-				tokenb.position = 0;
-			}
+      m = URI_RE.exec(uri);
+
+      host = m[1];
+      port = m[2] || DEFAULT_PORT;
+
+      if (!host) {
+        throw new Error("Expected hostname");
+      }
+
+      if (host.length > 256) {
+        throw new Error("Hostname must not exceed 256 characters");
+      }
+
+      if (m[3]) {
+        if (m[3].charAt(0) == "x") {
+          addr = parseInt("0" + m[3]);
+        } else {
+          m[3] = parseInt(m[3]);
+        }
+      } else {
+        addr = 1;
+      }
+
+      if (addr > 0xFFFFFFFF) {
+        throw new Error("Expected addr between x0 and xFFFFFFFF");
+      }
+
+      if (token != null) {
+        tokenb = token;
+        tokeno = tokenOffset;
+        tokenl = tokenLength;
+      } else if (m[4]) {
+        tokenb = new ByteArray();
+        tokenb.writeMultiByte(decodeURIComponent(m[4]), "us-ascii");
+        tokeno = 0;
+        tokenl = tokenb.length;
+      }
+
+      if (tokenb != null) {
+      	_token = encodeURIComponent(
+      						tokenb.readMultiByte(tokenb.length, "us-ascii"));
+      	tokenb.position = 0;
+      }
       
       if (mode < 0 || mode > StreamMode.READWRITE_EMIT) {
         throw new Error("Invalid stream mode");
