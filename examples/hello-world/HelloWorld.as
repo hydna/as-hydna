@@ -66,14 +66,14 @@ package {
 
       stream.addEventListener("data", function(e:StreamDataEvent) : void {
         trace("Data received: " + e.data.readUTFBytes(e.data.length));
-				trace("Emitting a signal");
+        trace("Emitting a signal");
         stream.emitUTFBytes("ping");
       });
 
       stream.addEventListener("emit", function(e:StreamEmitEvent) : void {
         trace("Signal received: " + e.data.readUTFBytes(e.data.length));
-				trace("Now closing");
-				stream.close();
+        trace("Now closing");
+        stream.close();
       });
 
       stream.addEventListener("connect", function(e:Event) : void {
@@ -82,6 +82,6 @@ package {
       });
 
       stream.connect(ADDRESS, StreamMode.READWRITE);
-  	}
-	}
+    }
+  }
 }

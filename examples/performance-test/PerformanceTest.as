@@ -65,7 +65,7 @@ package {
       
       trace("Hydna Actionscript Performance Test\n");
       
-			stream = new Stream();
+      stream = new Stream();
       
       stream.addEventListener("connect", function() : void {
         trace("Sending " + MESSAGE_COUNT + " messages (" + 
@@ -86,7 +86,7 @@ package {
           }
       });
 
-			stream.connect(ADDRESS, StreamMode.READWRITE);
+      stream.connect(ADDRESS, StreamMode.READWRITE);
     }
   }
 }
