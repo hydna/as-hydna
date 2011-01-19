@@ -260,20 +260,20 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
         return;
       } else if (_receiveBuffer.length > HANDSHAKE_RESP_SIZE) {
         errevent = new StreamErrorEvent("Server responed with bad handshake");
-        dispatchEvent(event);
+        dispatchEvent(errevent);
         return;
       }
       
       if (_receiveBuffer.readMultiByte(HANDSHAKE_RESP_SIZE - 1, "us-acii") 
           !== "DNA1") {
         errevent = new StreamErrorEvent("Server responed with bad handshake");
-        dispatchEvent(event);
+        dispatchEvent(errevent);
         return;
       }
       
       if ((code = _receiveBuffer.readByte()) > 0) {
         errevent = StreamErrorEvent.fromHandshakeError(code);
-        dispatchEvent(event);
+        dispatchEvent(errevent);
         return;
       }
 
