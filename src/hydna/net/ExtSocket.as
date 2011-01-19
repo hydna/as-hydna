@@ -51,8 +51,8 @@ package hydna.net {
   
   // Internal wrapper around flash.net.Socket
   internal class ExtSocket extends Socket {
-	
-	  private static const BROADCAST_ADDR:Number = 0;
+  
+    private static const BROADCAST_ADDR:Number = 0;
 
     private static const HANDSHAKE_SIZE:Number = 8;
     private static const HANDSHAKE_RESP_SIZE:Number = 5;
@@ -67,8 +67,8 @@ package hydna.net {
 
     private var _receiveBuffer:ByteArray;
     private var _uri:String;
-		private var _host:String;
-		private var _port:Number;
+    private var _host:String;
+    private var _port:Number;
 
     private var _pendingOpenRequests:Dictionary;
     private var _openStreams:Dictionary;
@@ -82,7 +82,7 @@ package hydna.net {
     
     // Return an available socket or create a new one.
     internal static function getSocket(host:String, port:Number) : ExtSocket {
-			var uri:String = "hydna:" + host + ":" + port;
+      var uri:String = "hydna:" + host + ":" + port;
       var socket:ExtSocket;
       
       if (availableSockets[uri]) {
@@ -102,8 +102,8 @@ package hydna.net {
       super();
 
       _uri = uri;
-			_host = host;
-			_port = port;
+      _host = host;
+      _port = port;
       
       _receiveBuffer = new ByteArray();
 
@@ -235,8 +235,8 @@ package hydna.net {
       addEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
 
       writeMultiByte("DNA1", "us-acii");
-			writeByte(_host.length);
-			writeMultiByte(_host, "us-ascii");
+      writeByte(_host.length);
+      writeMultiByte(_host, "us-ascii");
       
       try {
         flush();
@@ -582,9 +582,9 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
     // Finalize the Socket
     private function destroy(errorEvent:Event=null) : void {
       var event:Event = errorEvent;
-			var pending:Dictionary = _pendingOpenRequests;
-			var waitqueue:Dictionary = _openWaitQueue;
-			var openstreams:Dictionary = _openStreams;
+      var pending:Dictionary = _pendingOpenRequests;
+      var waitqueue:Dictionary = _openWaitQueue;
+      var openstreams:Dictionary = _openStreams;
       var key:Object;
       var i:Number;
       var l:Number;
@@ -600,36 +600,36 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
       removeEventListener(SecurityErrorEvent.SECURITY_ERROR, 
                                   securityErrorHandler);
 
-			// So we do not trigger destroy multiple times.
-			_pendingOpenRequests = null;
-			_openWaitQueue = null;
-			_openStreams = null;
+      // So we do not trigger destroy multiple times.
+      _pendingOpenRequests = null;
+      _openWaitQueue = null;
+      _openStreams = null;
       
       if (event == null) {
         event = new StreamErrorEvent("Unknown error");
       }
 
-			if (pending != null) {
-	      for (key in pending) {
-	        OpenRequest(pending[key]).stream.destroy(event);
-	      }
-			}
+      if (pending != null) {
+        for (key in pending) {
+          OpenRequest(pending[key]).stream.destroy(event);
+        }
+      }
       
-			if (waitqueue != null) {
-	      for (key in waitqueue) {
-	        queue = waitqueue[key] as Array;
-	        for (i = 0, l = queue.length; i < l; i++) {
-	          OpenRequest(queue[i]).stream.destroy(event);
-	        }
-	      }
-			}
-			
-			if (openstreams != null) {
-	      for (key in openstreams) {
-	        trace("destroy stream of key: " + key);
-	        Stream(openstreams[key]).destroy(event);
-	      }				
-			}
+      if (waitqueue != null) {
+        for (key in waitqueue) {
+          queue = waitqueue[key] as Array;
+          for (i = 0, l = queue.length; i < l; i++) {
+            OpenRequest(queue[i]).stream.destroy(event);
+          }
+        }
+      }
+      
+      if (openstreams != null) {
+        for (key in openstreams) {
+          trace("destroy stream of key: " + key);
+          Stream(openstreams[key]).destroy(event);
+        }        
+      }
       
       if (connected) {
         trace("destroy: call close");
@@ -637,9 +637,9 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
       }
       
       
-			if (availableSockets[_uri]) {
-      	delete availableSockets[_uri];
-			}
+      if (availableSockets[_uri]) {
+        delete availableSockets[_uri];
+      }
 
       trace("destroy: done");
     }

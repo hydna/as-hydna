@@ -47,7 +47,7 @@ package hydna.net {
   import hydna.net.StreamMode;
 
   public class Stream extends EventDispatcher {
-	
+  
     private static const DEFAULT_PORT:Number = 7010;
     private static const URI_RE:RegExp = /(?:hydna:){0,1}([\w\-\.]+)(?::(\d+)){0,1}(?:\/(\d+|x[a-fA-F0-9]+){0,1}){0,1}(?:\?(.+)){0,1}/;
     
@@ -121,9 +121,9 @@ package hydna.net {
       if (!_uri) {
         _uri = _socket.uri + "/" + _addr + (_token ? "?" + _token : "");
       }
-			
+      
       return _uri;
-		}
+    }
     
     /**
      *  Connects the stream to the specified uri. If the connection fails 
@@ -206,9 +206,9 @@ package hydna.net {
       }
 
       if (tokenb != null) {
-      	_token = encodeURIComponent(
-      						tokenb.readMultiByte(tokenb.length, "us-ascii"));
-      	tokenb.position = 0;
+        _token = encodeURIComponent(
+                  tokenb.readMultiByte(tokenb.length, "us-ascii"));
+        tokenb.position = 0;
       }
       
       if (mode < 0 || mode > StreamMode.READWRITE_EMIT) {
