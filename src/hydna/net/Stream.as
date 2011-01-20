@@ -184,7 +184,7 @@ package hydna.net {
         if (m[3].charAt(0) == "x") {
           addr = parseInt("0" + m[3]);
         } else {
-          m[3] = parseInt(m[3]);
+          addr = parseInt(m[3]);
         }
       } else {
         addr = 1;
