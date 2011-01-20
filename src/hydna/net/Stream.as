@@ -190,8 +190,8 @@ package hydna.net {
         addr = 1;
       }
 
-      if (addr > 0xFFFFFFFF) {
-        throw new Error("Expected addr between x0 and xFFFFFFFF");
+      if (addr == 0 || addr > 0xFFFFFFFF) {
+        throw new Error("Expected addr between x1 and xFFFFFFFF");
       }
 
       if (token != null) {
