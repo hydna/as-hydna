@@ -201,6 +201,7 @@ package hydna.net {
       } else if (m[4]) {
         tokenb = new ByteArray();
         tokenb.writeMultiByte(decodeURIComponent(m[4]), "us-ascii");
+        tokenb.position = 0;
         tokeno = 0;
         tokenl = tokenb.length;
       }
