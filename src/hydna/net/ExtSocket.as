@@ -174,6 +174,7 @@ package hydna.net {
           connect(_host, _port);
         }
       } else {
+        _pendingOpenRequests[addr] = request;
         writeBytes(request.packet);
         request.sent = true;
 
