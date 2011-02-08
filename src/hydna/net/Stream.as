@@ -376,7 +376,6 @@ package hydna.net {
 
     // Internally destroy socket.
     internal function destroy(event:Event=null) : void {
-      _connected = false;
       _pendingClose = false;
       _writable = false;
       _readable = false;
@@ -386,6 +385,7 @@ package hydna.net {
       }
 
       _addr = 0;
+      _connected = false;
       _socket = null;
       
       if (event != null) {
