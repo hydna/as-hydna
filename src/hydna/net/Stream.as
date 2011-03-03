@@ -261,7 +261,7 @@ package hydna.net {
         throw new IOError("Stream is not connected.");
       }
 
-      if (_mode == StreamMode.READ) {
+      if ((_mode & StreamMode.WRITE) != StreamMode.WRITE) {
         throw new Error("Stream is not writable");
       }
       
@@ -319,7 +319,7 @@ package hydna.net {
         throw new IOError("Stream is not connected.");
       }
 
-      if ((_mode & StreamMode.EMIT) == StreamMode.EMIT) {
+      if ((_mode & StreamMode.EMIT) != StreamMode.EMIT) {
         throw new Error("You do not have permission to send signals");
       }
 
