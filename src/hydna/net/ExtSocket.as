@@ -136,7 +136,7 @@ package hydna.net {
     // Decrease the reference count
     internal function deallocStream(addr:uint=0) : void {
       trace("deallocStream: - > ")
-      if (addr != 0) {
+      if (addr != 0 && _openStreams) {
         trace("deallocStream: - > delete stream of addr: " + addr);
         delete _openStreams[addr];
       }
@@ -591,6 +591,12 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
       var l:Number;
       var queue:Array;
       
+      if (openstreams == null) {
+        // Do not fire destroy multiple times.
+        
+        return;
+      }
+      
       trace("in destroy");
       
       removeEventListener(Event.CONNECT, connectHandler);
@@ -601,7 +607,6 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
       removeEventListener(SecurityErrorEvent.SECURITY_ERROR, 
                                   securityErrorHandler);
 
-      // So we do not trigger destroy multiple times.
       _pendingOpenRequests = null;
       _openWaitQueue = null;
       _openStreams = null;
@@ -625,12 +630,10 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
         }
       }
       
-      if (openstreams != null) {
-        for (key in openstreams) {
-          trace("destroy stream of key: " + key);
-          Stream(openstreams[key]).destroy(event);
-        }        
-      }
+      for (key in openstreams) {
+        trace("destroy stream of key: " + key);
+        Stream(openstreams[key]).destroy(event);
+      }        
       
       if (connected) {
         trace("destroy: call close");

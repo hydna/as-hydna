@@ -381,7 +381,7 @@ package hydna.net {
       _readable = false;
       
       if (_socket) {
-        _socket.deallocStream(_connected ? _addr : null);
+        _socket.deallocStream(_connected ? _addr : 0);
       }
 
       _addr = 0;
