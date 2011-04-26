@@ -435,7 +435,7 @@ package hydna.net {
     internal function destroy(event:Event=null) : void {
       var socket:ExtSocket = _socket;
       var connected:Boolean = _connected;
-      var ch:uint = ch;
+      var ch:uint = _ch;
 
       _ch = 0;
       _connected = false;
