@@ -509,20 +509,6 @@ package hydna.net {
 
           event = new StreamCloseEvent(payload);
 
-/*          if (ch == BROADCAST_ADDR) {
-            destroy(event);
-          } else {
-            stream = Stream(_openStreams[ch]);
-
-            if (stream == null) {
-              destroy(new StreamErrorEvent("Packet sent to unknown stream"));
-              return;
-            }
-
-            stream.destroy(event);
-          }
-          break;
-*/
         case Packet.SIG_ERR_PROTOCOL:
         case Packet.SIG_ERR_OPERATION:
         case Packet.SIG_ERR_LIMIT:
