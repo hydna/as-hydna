@@ -1,46 +1,47 @@
 // ExtSocket.as
 
-/** 
+/**
  *        Copyright 2010 Hydna AB. All rights reserved.
  *
- *  Redistribution and use in source and binary forms, with or without 
- *  modification, are permitted provided that the following conditions 
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
  *  are met:
  *
- *    1. Redistributions of source code must retain the above copyright notice, 
+ *    1. Redistributions of source code must retain the above copyright notice,
  *       this list of conditions and the following disclaimer.
  *
- *    2. Redistributions in binary form must reproduce the above copyright 
- *       notice, this list of conditions and the following disclaimer in the 
+ *    2. Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
  *
- *  THIS SOFTWARE IS PROVIDED BY HYDNA AB ``AS IS'' AND ANY EXPRESS 
- *  OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
- *  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- *  ARE DISCLAIMED. IN NO EVENT SHALL HYDNA AB OR CONTRIBUTORS BE LIABLE FOR 
- *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
- *  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR 
- *  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) 
- *  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
- *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY 
- *  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
+ *  THIS SOFTWARE IS PROVIDED BY HYDNA AB ``AS IS'' AND ANY EXPRESS
+ *  OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ *  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ *  ARE DISCLAIMED. IN NO EVENT SHALL HYDNA AB OR CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ *  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ *  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ *  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ *  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  *  SUCH DAMAGE.
  *
- *  The views and conclusions contained in the software and documentation are 
- *  those of the authors and should not be interpreted as representing 
+ *  The views and conclusions contained in the software and documentation are
+ *  those of the authors and should not be interpreted as representing
  *  official policies, either expressed or implied, of Hydna AB.
  */
- 
+
 package hydna.net {
-  
+
   import flash.events.Event;
   import flash.events.IOErrorEvent;
   import flash.events.ProgressEvent;
   import flash.events.SecurityErrorEvent;
+  import flash.errors.IOError;
   import flash.net.Socket;
   import flash.utils.ByteArray;
   import flash.utils.Dictionary;
-  
+
   import hydna.net.OpenRequest;
   import hydna.net.Packet;
   import hydna.net.Stream;
@@ -48,10 +49,10 @@ package hydna.net {
   import hydna.net.StreamErrorEvent;
   import hydna.net.StreamEmitEvent;
   import hydna.net.StreamCloseEvent;
-  
+
   // Internal wrapper around flash.net.Socket
   internal class ExtSocket extends Socket {
-  
+
     private static const BROADCAST_ADDR:Number = 0;
 
     private static const HANDSHAKE_SIZE:Number = 8;
@@ -59,7 +60,7 @@ package hydna.net {
 
     private static const SUCCESS:Number = 0;
     private static const CUSTOM_ERR_CODE:Number = 0xf;
-    
+
     private static var availableSockets:Dictionary;
 
     private var _connecting:Boolean = false;
@@ -73,25 +74,25 @@ package hydna.net {
     private var _pendingOpenRequests:Dictionary;
     private var _openStreams:Dictionary;
     private var _openWaitQueue:Dictionary;
-    
+
     private var _streamRefCount:Number = 0;
-    
+
     {
       availableSockets = new Dictionary();
     }
-    
+
     // Return an available socket or create a new one.
     internal static function getSocket(host:String, port:Number) : ExtSocket {
       var uri:String = "hydna:" + host + ":" + port;
       var socket:ExtSocket;
-      
+
       if (availableSockets[uri]) {
         socket = availableSockets[uri];
       } else {
         socket = new ExtSocket(uri, host, port);
         availableSockets[uri] = socket;
       }
-      
+
       return socket;
     }
 
@@ -104,43 +105,43 @@ package hydna.net {
       _uri = uri;
       _host = host;
       _port = port;
-      
+
       _receiveBuffer = new ByteArray();
 
       _pendingOpenRequests = new Dictionary();
       _openStreams = new Dictionary();
       _openWaitQueue = new Dictionary();
-      
+
       addEventListener(Event.CONNECT, connectHandler);
       addEventListener(Event.CLOSE, closeHandler);
       addEventListener(IOErrorEvent.IO_ERROR, errorHandler);
-      addEventListener(SecurityErrorEvent.SECURITY_ERROR, 
+      addEventListener(SecurityErrorEvent.SECURITY_ERROR,
                        securityErrorHandler);
     }
 
     internal function get uri() : String {
       return _uri;
     }
-    
+
     internal function get handshaked() : Boolean {
       return _handshaked;
     }
-    
-    // Internal method to keep track of no of streams that is associated 
+
+    // Internal method to keep track of no of streams that is associated
     // with this connection instance.
     internal function allocStream() : void {
       _streamRefCount++;
       trace("allocStream: --> " + _streamRefCount);
     }
-    
+
     // Decrease the reference count
-    internal function deallocStream(addr:uint=0) : void {
+    internal function deallocStream(ch:uint=0) : void {
       trace("deallocStream: - > ")
-      if (addr != 0 && _openStreams) {
-        trace("deallocStream: - > delete stream of addr: " + addr);
-        delete _openStreams[addr];
+      if (ch != 0 && _openStreams) {
+        trace("deallocStream: - > delete stream of ch: " + ch);
+        delete _openStreams[ch];
       }
-      
+
       if (--_streamRefCount == 0) {
         trace("no more refs, destroy")
         destroy();
@@ -150,31 +151,31 @@ package hydna.net {
     // Request to open a stream. Return true if request went well, else
     // false.
     internal function requestOpen(request:OpenRequest) : Boolean {
-      var addr:uint = request.addr;
+      var ch:uint = request.ch;
       var queue:Array;
 
-      if (_openStreams[addr]) {
+      if (_openStreams[ch]) {
         return false;
       }
 
-      if (_pendingOpenRequests[addr]) {
-        
-        queue = _openWaitQueue[addr] as Array;
-        
+      if (_pendingOpenRequests[ch]) {
+
+        queue = _openWaitQueue[ch] as Array;
+
         if (!queue) {
-          _openWaitQueue[addr] = queue = new Array();
-        } 
-        
+          _openWaitQueue[ch] = queue = new Array();
+        }
+
         queue.push(request);
-        
+
       } else if (!_handshaked) {
-        _pendingOpenRequests[addr] = request;
+        _pendingOpenRequests[ch] = request;
         if (!_connecting) {
           _connecting = true;
           connect(_host, _port);
         }
       } else {
-        _pendingOpenRequests[addr] = request;
+        _pendingOpenRequests[ch] = request;
         writeBytes(request.packet);
         request.sent = true;
 
@@ -185,48 +186,48 @@ package hydna.net {
           return false;
         }
       }
-      
+
       return true;
     }
-    
+
     // Try to cancel an open request. Returns true on success else
     // false.
     internal function cancelOpen(request:OpenRequest) : Boolean {
-      var addr:uint = request.addr;
+      var ch:uint = request.ch;
       var queue:Array;
       var index:Number;
-      
+
       if (request.sent) {
         return false;
       }
-      
-      queue = _openWaitQueue[addr] as Array;
-      
-      if (_pendingOpenRequests[addr]) {
-        delete _pendingOpenRequests[addr];
-        
+
+      queue = _openWaitQueue[ch] as Array;
+
+      if (_pendingOpenRequests[ch]) {
+        delete _pendingOpenRequests[ch];
+
         if (queue != null && queue.length)  {
-          _pendingOpenRequests[addr] = queue.pop();
+          _pendingOpenRequests[ch] = queue.pop();
         }
-        
+
         return true;
       }
-      
+
       // Should not happen...
       if (queue == null) {
         return false;
       }
-      
+
       index = queue.indexOf(request);
-      
+
       if (index != -1) {
         queue.splice(index, 1);
         return true;
       }
-      
+
       return false;
     }
-    
+
     //  Send a handshake packet and wait for a handshake
     // response packet in return.
     private function connectHandler(event:Event) : void {
@@ -238,7 +239,7 @@ package hydna.net {
       writeMultiByte("DNA1", "us-acii");
       writeByte(_host.length);
       writeMultiByte(_host, "us-ascii");
-      
+
       try {
         flush();
       } catch (error:Error) {
@@ -252,7 +253,7 @@ package hydna.net {
       var request:OpenRequest;
       var code:Number;
       var errevent:Event;
-      
+
 trace("incomming handshake response");
       readBytes(_receiveBuffer, _receiveBuffer.length, bytesAvailable);
 
@@ -264,14 +265,14 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
         dispatchEvent(errevent);
         return;
       }
-      
-      if (_receiveBuffer.readMultiByte(HANDSHAKE_RESP_SIZE - 1, "us-acii") 
+
+      if (_receiveBuffer.readMultiByte(HANDSHAKE_RESP_SIZE - 1, "us-acii")
           !== "DNA1") {
         errevent = new StreamErrorEvent("Server responed with bad handshake");
         dispatchEvent(errevent);
         return;
       }
-      
+
       if ((code = _receiveBuffer.readByte()) > 0) {
         errevent = StreamErrorEvent.fromHandshakeError(code);
         dispatchEvent(errevent);
@@ -297,19 +298,19 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
       } catch (error:Error) {
         destroy(StreamErrorEvent.fromError(error));
       }
-      
-      trace("Handshake process is now done!");      
+
+      trace("Handshake process is now done!");
     }
-    
+
     // Handles all incomming data.
     private function receiveHandler(event:ProgressEvent) : void {
       var stream:Stream = null;
       var size:uint;
-      var addr:uint; 
+      var ch:uint;
       var op:Number;
       var flag:Number;
       var payload:ByteArray;
-      
+
       readBytes(_receiveBuffer, _receiveBuffer.length, bytesAvailable);
 
       while (_receiveBuffer.bytesAvailable >= Packet.HEADER_SIZE) {
@@ -322,51 +323,51 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
         }
 
         _receiveBuffer.readUnsignedByte(); // Reserved
-        addr = _receiveBuffer.readUnsignedInt();
+        ch = _receiveBuffer.readUnsignedInt();
         op = _receiveBuffer.readUnsignedByte();
         flag = (op & 0xf);
-        
+
         if (size - Packet.HEADER_SIZE) {
           payload = new ByteArray();
           _receiveBuffer.readBytes(payload, 0, size - Packet.HEADER_SIZE);
         }
-        
+
         trace("incomming op: " + (op >> 4));
-        
+
         switch ((op >> 4)) {
 
           case Packet.OPEN:
             trace("open response");
-            processOpenPacket(addr, flag, payload);
+            processOpenPacket(ch, flag, payload);
             break;
-            
+
           case Packet.DATA:
             trace("incomming data");
-            processDataPacket(addr, flag, payload);
+            processDataPacket(ch, flag, payload);
             break;
-            
+
           case Packet.SIGNAL:
-            processSignalPacket(addr, flag, payload);
+            processSignalPacket(ch, flag, payload);
             break;
         }
       }
-      
+
       if (_receiveBuffer.bytesAvailable == 0) {
         _receiveBuffer = new ByteArray();
       }
     }
 
     // process an open packet
-    private function processOpenPacket( addr:uint
+    private function processOpenPacket( ch:uint
                                       , flag:Number
                                       , payload:ByteArray) : void {
       var request:OpenRequest;
       var stream:Stream;
-      var redirectaddr:uint;
+      var redirectch:uint;
       var event:Event;
 
-      request = OpenRequest(_pendingOpenRequests[addr]);
-      
+      request = OpenRequest(_pendingOpenRequests[ch]);
+
       if (request == null) {
         event = new StreamErrorEvent("Server sent invalid open packet");
         destroy(event);
@@ -374,32 +375,32 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
       }
 
       stream = request.stream;
-      
+
       switch (flag) {
 
         case Packet.OPEN_SUCCESS:
-          _openStreams[addr] = stream;
-          stream.openSuccess(request.addr);
+          _openStreams[ch] = stream;
+          stream.openSuccess(request.ch);
           break;
-          
+
         case Packet.OPEN_REDIRECT:
-          
+
           if (payload == null || payload.length < 4) {
-            destroy(new StreamErrorEvent("Expected redirect addr from server"));
+            destroy(new StreamErrorEvent("Expected redirect channel from server"));
             return;
           }
-          
-          redirectaddr = payload.readUnsignedInt();
-          
-          if (_openStreams[redirectaddr]) {
+
+          redirectch = payload.readUnsignedInt();
+
+          if (_openStreams[redirectch]) {
             destroy(new StreamErrorEvent("Server redirected to open stream"));
             return;
           }
-          
-          _openStreams[redirectaddr] = stream;
-          stream.openSuccess(redirectaddr);
+
+          _openStreams[redirectch] = stream;
+          stream.openSuccess(redirectch);
           break;
-          
+
         case Packet.OPEN_FAIL_NA:
         case Packet.OPEN_FAIL_MODE:
         case Packet.OPEN_FAIL_PROTOCOL:
@@ -417,69 +418,70 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
           return;
       }
 
-      if (_openWaitQueue[addr] && _openWaitQueue[addr].length) {
-        
-        // Destroy all pending request IF response wasn't a 
+      if (_openWaitQueue[ch] && _openWaitQueue[ch].length) {
+
+        // Destroy all pending request IF response wasn't a
         // redirected stream.
-        if (flag == Packet.OPEN_REDIRECT && redirectaddr == addr) {
-          delete _pendingOpenRequests[addr];
-          
+        if (flag == Packet.OPEN_REDIRECT && redirectch == ch) {
+          delete _pendingOpenRequests[ch];
+
           event = new StreamErrorEvent("Stream already open");
-          
-          while ((request = OpenRequest(_openWaitQueue[addr].pop()))) {
+
+          while ((request = OpenRequest(_openWaitQueue[ch].pop()))) {
             request.stream.destroy(event);
           }
           return;
         }
-        
-        request = _openWaitQueue[addr].pop();
-        _pendingOpenRequests[addr] = request;
-        
-        if (!_openWaitQueue[addr].length) {
-          delete _openWaitQueue[addr];
+
+        request = _openWaitQueue[ch].pop();
+        _pendingOpenRequests[ch] = request;
+
+        if (!_openWaitQueue[ch].length) {
+          delete _openWaitQueue[ch];
         }
-        
+
         writeBytes(request.packet);
         request.sent = true;
-        
+
         try {
           flush();
         } catch (error:Error) {
           destroy(StreamErrorEvent.fromError(error));
         }
-        
+
       } else {
-        delete _pendingOpenRequests[addr];
+        delete _pendingOpenRequests[ch];
       }
-                                        
+
     }
-    
+
     // process a data packet
-    private function processDataPacket( addr:uint
+    private function processDataPacket( ch:uint
                                       , flag:Number
                                       , payload:ByteArray) : void {
       var stream:Stream;
       var event:Event;
+      var packet:Packet;
 
       if (payload == null || payload.length == 0) {
         destroy(new StreamErrorEvent("Zero data packet sent received"));
         return;
       }
-      
-      if (addr == BROADCAST_ADDR) {
+
+      if (ch == BROADCAST_ADDR) {
         for (var key:String in _openStreams) {
           event = new StreamDataEvent(flag, payload);
           stream = Stream(_openStreams[key]);
           stream.dispatchEvent(event);
         }
       } else {
-        stream = Stream(_openStreams[addr]);
+        stream = Stream(_openStreams[ch]);
 
         if (stream == null) {
           destroy(new StreamErrorEvent("Packet sent to unknown stream"));
           return;
         }
-        
+
         event = new StreamDataEvent(flag, payload);
 
         stream.dispatchEvent(event);
@@ -487,17 +489,18 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
     }
 
     // process a signal packet
-    private function processSignalPacket( addr:uint
+    private function processSignalPacket( ch:uint
                                         , flag:Number
                                         , payload:ByteArray) : void {
+      var event:Event = null;
       var stream:Stream;
-      var event:Event;
-      
+      var packet:Packet;
+
       switch (flag) {
-        
+
         case Packet.SIG_EMIT:
-        
-          if (addr == BROADCAST_ADDR) {
+
+          if (ch == BROADCAST_ADDR) {
             for (var key:String in _openStreams) {
               event = new StreamEmitEvent(payload);
               stream = Stream(_openStreams[key]);
@@ -505,8 +508,8 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
             }
           } else {
             event = new StreamEmitEvent(payload);
-            
-            stream = Stream(_openStreams[addr]);
+
+            stream = Stream(_openStreams[ch]);
 
             if (stream == null) {
               destroy(new StreamErrorEvent("Packet sent to unknown stream"));
@@ -516,25 +519,25 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
             stream.dispatchEvent(event);
           }
           break;
-          
+
         case Packet.SIG_END:
 
           event = new StreamCloseEvent(payload);
-          
-          if (addr == BROADCAST_ADDR) {
+
+/*          if (ch == BROADCAST_ADDR) {
             destroy(event);
           } else {
-            stream = Stream(_openStreams[addr]);
+            stream = Stream(_openStreams[ch]);
 
             if (stream == null) {
               destroy(new StreamErrorEvent("Packet sent to unknown stream"));
               return;
             }
-            
+
             stream.destroy(event);
           }
           break;
-          
+*/
         case Packet.SIG_ERR_PROTOCOL:
         case Packet.SIG_ERR_OPERATION:
         case Packet.SIG_ERR_LIMIT:
@@ -542,30 +545,47 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
         case Packet.SIG_ERR_VIOLATION:
         case Packet.SIG_ERR_OTHER:
 
-          event = StreamErrorEvent.fromSigError(flag, payload);
-          
-          if (addr == BROADCAST_ADDR) {
+          if (event == null) {
+            event = StreamErrorEvent.fromSigError(flag, payload);
+          }
+
+          if (ch == BROADCAST_ADDR) {
             destroy(event);
           } else {
-            stream = Stream(_openStreams[addr]);
+            stream = Stream(_openStreams[ch]);
 
             if (stream == null) {
-              destroy(new StreamErrorEvent("Packet sent to unknown stream"));
+              destroy(new StreamErrorEvent("Received unknown channel"));
               return;
             }
-            
-            stream.destroy(event);
+
+            if (stream.isClosing() == false) {
+              // We havent closed our stream yet. We therefor need to send
+              // and an ENDSIG in response to this packet.
+
+              packet = new Packet(ch, Packet.SIGNAL, Packet.SIG_END, payload);
+
+              try {
+                this.writeBytes(packet);
+                this.flush();
+              } catch (error:IOError) {
+                destroy(StreamErrorEvent.fromError(error));
+                return;
+              }
+            } else {
+              stream.destroy(event);
+            }
           }
           break;
-          
+
         default:
-          destroy(new StreamErrorEvent("Server sent an unknown packet flag"));
+          destroy(new StreamErrorEvent("Received unknown packet flag"));
           break;
-        
+
       }
-      
+
     }
-    
+
     private function securityErrorHandler(event:SecurityErrorEvent) : void {
       destroy(new StreamErrorEvent("Security error"));
     }
@@ -579,7 +599,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
     private function closeHandler(event:Event) : void {
       destroy(new StreamErrorEvent("Disconnected from server"));
     }
-    
+
     // Finalize the Socket
     private function destroy(errorEvent:Event=null) : void {
       var event:Event = errorEvent;
@@ -590,27 +610,27 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
       var i:Number;
       var l:Number;
       var queue:Array;
-      
+
       if (openstreams == null) {
         // Do not fire destroy multiple times.
-        
+
         return;
       }
-      
+
       trace("in destroy");
-      
+
       removeEventListener(Event.CONNECT, connectHandler);
       removeEventListener(Event.CLOSE, closeHandler);
       removeEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
       removeEventListener(ProgressEvent.SOCKET_DATA, receiveHandler);
       removeEventListener(IOErrorEvent.IO_ERROR, errorHandler);
-      removeEventListener(SecurityErrorEvent.SECURITY_ERROR, 
+      removeEventListener(SecurityErrorEvent.SECURITY_ERROR,
                                   securityErrorHandler);
 
       _pendingOpenRequests = null;
       _openWaitQueue = null;
       _openStreams = null;
-      
+
       if (event == null) {
         event = new StreamErrorEvent("Unknown error");
       }
@@ -620,7 +640,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
           OpenRequest(pending[key]).stream.destroy(event);
         }
       }
-      
+
       if (waitqueue != null) {
         for (key in waitqueue) {
           queue = waitqueue[key] as Array;
@@ -629,24 +649,24 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
           }
         }
       }
-      
+
       for (key in openstreams) {
         trace("destroy stream of key: " + key);
         Stream(openstreams[key]).destroy(event);
-      }        
-      
+      }
+
       if (connected) {
         trace("destroy: call close");
         close();
       }
-      
-      
+
+
       if (availableSockets[_uri]) {
         delete availableSockets[_uri];
       }
 
       trace("destroy: done");
     }
-    
+
   }
 }

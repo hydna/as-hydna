@@ -44,7 +44,7 @@ package hydna.net {
     public function StreamCloseEvent(data:ByteArray) {
       super(CLOSE, false, false);
       
-      if (data != null || data.length != 0) {
+      if (data != null && data.length != 0) {
         _message = data.readUTFBytes(data.length);
       }
     }

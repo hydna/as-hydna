@@ -42,15 +42,15 @@ package hydna.net {
   internal class OpenRequest {
 
     internal var _stream:Stream;
-    internal var _addr:uint;
+    internal var _ch:uint;
     internal var _packet:Packet;
     internal var _sent:Boolean;
 
     public function OpenRequest( stream:Stream
-                               , addr:uint
+                               , ch:uint
                                , packet:Packet) {
       _stream = stream;
-      _addr = addr;
+      _ch = ch;
       _packet = packet;
     }
 
@@ -58,8 +58,8 @@ package hydna.net {
       return _stream;
     }
 
-    public function get addr() : uint {
-      return _addr;
+    public function get ch() : uint {
+      return _ch;
     }
 
     public function get packet() : Packet {

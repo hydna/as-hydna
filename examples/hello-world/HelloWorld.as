@@ -81,7 +81,11 @@ package {
         stream.writeUTFBytes("ping");
       });
 
-      stream.connect(ADDRESS, StreamMode.READWRITE);
+      stream.addEventListener("close", function(e:Event) : void {
+        trace("Received close event");
+      });
+
+      stream.connect(ADDRESS, StreamMode.READWRITEEMIT);
     }
   }
 }
