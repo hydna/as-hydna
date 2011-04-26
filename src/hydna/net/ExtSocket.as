@@ -131,19 +131,16 @@ package hydna.net {
     // with this connection instance.
     internal function allocStream() : void {
       _streamRefCount++;
-      trace("allocStream: --> " + _streamRefCount);
     }
 
     // Decrease the reference count
     internal function deallocStream(ch:uint=0) : void {
-      trace("deallocStream: - > ")
+
       if (ch != 0 && _openStreams) {
-        trace("deallocStream: - > delete stream of ch: " + ch);
         delete _openStreams[ch];
       }
 
       if (--_streamRefCount == 0) {
-        trace("no more refs, destroy")
         destroy();
       }
     }
@@ -232,8 +229,6 @@ package hydna.net {
     // response packet in return.
     private function connectHandler(event:Event) : void {
 
-      trace("in connect");
-
       addEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
 
       writeMultiByte("DNA1", "us-acii");
@@ -254,11 +249,9 @@ package hydna.net {
       var code:Number;
       var errevent:Event;
 
-trace("incomming handshake response");
       readBytes(_receiveBuffer, _receiveBuffer.length, bytesAvailable);
 
       if (_receiveBuffer.length < HANDSHAKE_RESP_SIZE) {
-trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE);
         return;
       } else if (_receiveBuffer.length > HANDSHAKE_RESP_SIZE) {
         errevent = new StreamErrorEvent("Server responed with bad handshake");
@@ -281,7 +274,7 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
 
       _handshaked = true;
       _connecting = false;
-      trace("bytesAvailable: " + bytesAvailable);
+
       _receiveBuffer = new ByteArray();
       removeEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
       addEventListener(ProgressEvent.SOCKET_DATA, receiveHandler);
@@ -290,7 +283,6 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
         request = OpenRequest(_pendingOpenRequests[key]);
         writeBytes(request.packet);
         request.sent = true;
-        trace("send open request")
       }
 
       try {
@@ -298,8 +290,6 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
       } catch (error:Error) {
         destroy(StreamErrorEvent.fromError(error));
       }
-
-      trace("Handshake process is now done!");
     }
 
     // Handles all incomming data.
@@ -318,7 +308,6 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
 
         if (_receiveBuffer.bytesAvailable < (size - 2)) {
           _receiveBuffer.position -= 2;
-          trace("return!");
           return;
         }
 
@@ -332,17 +321,13 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
           _receiveBuffer.readBytes(payload, 0, size - Packet.HEADER_SIZE);
         }
 
-        trace("incomming op: " + (op >> 4));
-
         switch ((op >> 4)) {
 
           case Packet.OPEN:
-            trace("open response");
             processOpenPacket(ch, flag, payload);
             break;
 
           case Packet.DATA:
-            trace("incomming data");
             processDataPacket(ch, flag, payload);
             break;
 
@@ -617,8 +602,6 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
         return;
       }
 
-      trace("in destroy");
-
       removeEventListener(Event.CONNECT, connectHandler);
       removeEventListener(Event.CLOSE, closeHandler);
       removeEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
@@ -651,12 +634,10 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
       }
 
       for (key in openstreams) {
-        trace("destroy stream of key: " + key);
         Stream(openstreams[key]).destroy(event);
       }
 
       if (connected) {
-        trace("destroy: call close");
         close();
       }
 
@@ -665,7 +646,6 @@ trace("buffer to small, expect " + _receiveBuffer.length + "/" + HANDSHAKE_SIZE)
         delete availableSockets[_uri];
       }
 
-      trace("destroy: done");
     }
 
   }
