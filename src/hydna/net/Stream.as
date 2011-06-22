@@ -255,7 +255,7 @@ package hydna.net {
     public function writeBytes( data:ByteArray
                               , offset:uint=0
                               , length:uint=0
-                              , priority:uint=0) : void {
+                              , priority:uint=1) : void {
       var packet:Packet;
 
       if (connected == false || _socket == null) {
@@ -266,8 +266,8 @@ package hydna.net {
         throw new Error("Stream is not writable");
       }
 
-      if (priority > 3) {
-        throw new RangeError("Priority must be between 0 - 3");
+      if (priority < 1 || priority > 5) {
+        throw new RangeError("Priority must be between 1 - 5");
       }
 
       packet = new Packet( _ch, Packet.DATA, priority
