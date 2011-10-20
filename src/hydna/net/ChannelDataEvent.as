@@ -1,4 +1,4 @@
-// OpenRequest.as
+// ChannelDataEvent.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -29,49 +29,37 @@
  *  The views and conclusions contained in the software and documentation are 
  *  those of the authors and should not be interpreted as representing 
  *  official policies, either expressed or implied, of Hydna AB.
- */
-
+ */ 
 package hydna.net {
-
+  
+  import flash.events.Event;
   import flash.utils.ByteArray;
-
-  import hydna.net.Packet;
-  import hydna.net.Channel;
-
-  // Internal class to handle open requests.
-  internal class OpenRequest {
-
-    internal var _stream:Channel;
-    internal var _ch:uint;
-    internal var _packet:Packet;
-    internal var _sent:Boolean;
-
-    public function OpenRequest( stream:Channel
-                               , ch:uint
-                               , packet:Packet) {
-      _stream = stream;
-      _ch = ch;
-      _packet = packet;
+  
+  public class ChannelDataEvent extends Event {
+    
+    public static const DATA:String = "data";
+    
+    private var _data:ByteArray;
+    private var _priority:Number
+    
+    public function ChannelDataEvent(priority:Number, data:ByteArray) {
+      super(DATA, false, false);
+      _data = data;
+      _priority = priority;
     }
-
-    public function get stream() : Channel {
-      return _stream;
+    
+    /**
+     *  Returns the data associated with this ChannelDataEvent instance.
+     */
+    public function get data() : ByteArray {
+      return _data;
     }
-
-    public function get ch() : uint {
-      return _ch;
+    
+    public function get priority() : Number {
+      return _priority;
     }
-
-    public function get packet() : Packet {
-      return _packet;
-    }
-
-    public function get sent() : Boolean {
-      return _sent;
-    }
-
-    public function set sent(value:Boolean) : void {
-      _sent = value;
-    }
+    
   }
+  
+  
 }

@@ -1,4 +1,4 @@
-// OpenRequest.as
+// ChannelMode.as
 
 /** 
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -29,49 +29,20 @@
  *  The views and conclusions contained in the software and documentation are 
  *  those of the authors and should not be interpreted as representing 
  *  official policies, either expressed or implied, of Hydna AB.
- */
-
+ */ 
 package hydna.net {
-
-  import flash.utils.ByteArray;
-
-  import hydna.net.Packet;
-  import hydna.net.Channel;
-
-  // Internal class to handle open requests.
-  internal class OpenRequest {
-
-    internal var _stream:Channel;
-    internal var _ch:uint;
-    internal var _packet:Packet;
-    internal var _sent:Boolean;
-
-    public function OpenRequest( stream:Channel
-                               , ch:uint
-                               , packet:Packet) {
-      _stream = stream;
-      _ch = ch;
-      _packet = packet;
-    }
-
-    public function get stream() : Channel {
-      return _stream;
-    }
-
-    public function get ch() : uint {
-      return _ch;
-    }
-
-    public function get packet() : Packet {
-      return _packet;
-    }
-
-    public function get sent() : Boolean {
-      return _sent;
-    }
-
-    public function set sent(value:Boolean) : void {
-      _sent = value;
-    }
+  
+  public class ChannelMode {
+    
+    public static const LISTEN:Number = 0x00;
+    public static const READ:Number = 0x01;
+    public static const WRITE:Number = 0x02;
+    public static const READWRITE:Number = 0x03;
+    public static const EMIT:Number = 0x04;
+    public static const READEMIT:Number = 0x05;
+    public static const WRITEEMIT:Number = 0x06;
+    public static const READWRITEEMIT:Number = 0x07;
+    
   }
+  
 }
