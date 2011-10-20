@@ -93,21 +93,21 @@ package hydna.net {
     }
 
     /**
-     *  Return true if stream is readable
+     *  Return true if channel is readable
      */
     public function get readable() : Boolean {
       return _connected && _readable;
     }
 
     /**
-     *  Return true if stream is writable
+     *  Return true if channel is writable
      */
     public function get writable() : Boolean {
       return _connected && _writable;
     }
 
     /**
-     *  Return true if stream emitable.
+     *  Return true if channel emitable.
      */
     public function get emitable() : Boolean {
       return _connected && _emitable;
@@ -128,7 +128,7 @@ package hydna.net {
     }
 
     /**
-     *  Connects the stream to the specified uri. If the connection fails
+     *  Connects the channel to the specified uri. If the connection fails
      *  immediately, either an event is dispatched or an exception is thrown:
      *  an error event is dispatched if a host was specified, and an exception
      *  is thrown if no host was specified. Otherwise, the status of the
@@ -216,7 +216,7 @@ package hydna.net {
       }
 
       if (mode < 0 || mode > ChannelMode.READWRITEEMIT) {
-        throw new Error("Invalid stream mode");
+        throw new Error("Invalid channel mode");
       }
 
       _mode = mode;
@@ -283,7 +283,7 @@ package hydna.net {
      *  which indicates the length of the specified UTF-8 string in bytes,
      *  followed by the string itself.
      *
-     *  @param {String} value The string to write to the stream.
+     *  @param {String} value The string to write to the channel.
      */
     public function writeUTF(value:String) : void {
       var data:ByteArray = new ByteArray();
@@ -292,11 +292,11 @@ package hydna.net {
     }
 
     /**
-     *  Writes a UTF-8 string to the stream. Similar to the writeUTF()
+     *  Writes a UTF-8 string to the channel. Similar to the writeUTF()
      *  method, but writeUTFBytes() does not prefix the string with a 16-bit
      *  length word.
      *
-     *  @param value The string to write to the stream.
+     *  @param value The string to write to the channel.
      */
     public function writeUTFBytes(value:String) : void {
       var data:ByteArray = new ByteArray();
@@ -305,12 +305,12 @@ package hydna.net {
     }
 
     /**
-     *  Emit's a signal to the stream.
+     *  Emit's a signal to the channel.
      *
      *  <p>Note: Channel must be opened with the mode EMIT in order to use
      *     the emit method.</p>
      *
-     *  @param value The string to write to the stream.
+     *  @param value The string to write to the channel.
      */
     public function emit(data:ByteArray,
                          offset:uint=0,
@@ -332,9 +332,9 @@ package hydna.net {
     }
 
     /**
-     *  Emit's an UTF-8 signal to the stream.
+     *  Emit's an UTF-8 signal to the channel.
      *
-     *  @param value The string to emit to the stream.
+     *  @param value The string to emit to the channel.
      *  @param type An optional type for the signal.
      */
     public function emitUTFBytes(value:String, type:Number=0) : void {
@@ -368,7 +368,7 @@ package hydna.net {
 
       if (_openRequest != null && _socket.cancelOpen(_openRequest)) {
         // Open request hasn't been posted yet, which means that it's
-        // safe to destroy stream immediately.
+        // safe to destroy channel immediately.
 
         _openRequest = null;
         destroy();
@@ -414,7 +414,7 @@ package hydna.net {
           // channel is changed. We need to change the channel of the
           // frame before sending to server.
 
-          frame.channel = respid;
+          frame.id = respid;
         }
 
         try {
