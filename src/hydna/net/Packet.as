@@ -30,6 +30,8 @@
  *  those of the authors and should not be interpreted as representing
  *  official policies, either expressed or implied, of Hydna AB.
  */
+
+
 package hydna.net {
 
   import flash.utils.ByteArray;
@@ -115,7 +117,7 @@ package hydna.net {
         writeBytes(payload, fixedOffset, fixedLength);
       }
     }
-    
+
     public function get channel() : uint {
       var pos:uint = this.position;
       var value:uint;
@@ -135,4 +137,5 @@ package hydna.net {
       this.position = pos;
     }
   }
+
 }

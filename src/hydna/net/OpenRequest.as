@@ -31,6 +31,7 @@
  *  official policies, either expressed or implied, of Hydna AB.
  */
 
+
 package hydna.net {
 
   import flash.utils.ByteArray;
@@ -74,4 +75,5 @@ package hydna.net {
       _sent = value;
     }
   }
+
 }
