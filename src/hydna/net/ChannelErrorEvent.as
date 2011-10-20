@@ -108,31 +108,31 @@ package hydna.net {
 
       switch (code) {
         case Frame.OPEN_FAIL_NA:
-          msg = msg || "Failed to open stream, not available";
+          msg = msg || "Failed to open channel, not available";
           break;
         case Frame.OPEN_FAIL_MODE:
-          msg = msg || "Not allowed to open stream with specified mode";
+          msg = msg || "Not allowed to open channel with specified mode";
           break;
         case Frame.OPEN_FAIL_PROTOCOL:
-          msg = msg || "Not allowed to open stream with specified protocol";
+          msg = msg || "Not allowed to open channel with specified protocol";
           break;
         case Frame.OPEN_FAIL_HOST:
-          msg = msg || "Not allowed to open stream from host";
+          msg = msg || "Not allowed to open channel from host";
           break;
         case Frame.OPEN_FAIL_AUTH:
-          msg = msg || "Not allowed to open stream with credentials";
+          msg = msg || "Not allowed to open channel with credentials";
           break;
         case Frame.OPEN_FAIL_SERVICE_NA:
-          msg = msg || "Failed to open stream, service is not available";
+          msg = msg || "Failed to open channel, service is not available";
           break;
         case Frame.OPEN_FAIL_SERVICE_ERR:
-          msg = msg || "Failed to open stream, service error";
+          msg = msg || "Failed to open channel, service error";
           break;
 
         default:
         case Frame.OPEN_FAIL_OTHER:
           code = Frame.OPEN_FAIL_OTHER;
-          msg = msg || "Failed to open stream, unknown error";
+          msg = msg || "Failed to open channel, unknown error";
           break;
       }
 

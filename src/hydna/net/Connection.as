@@ -54,7 +54,7 @@ package hydna.net {
   // Internal wrapper around flash.net.Socket
   internal class Connection extends Socket {
 
-    private static const BROADCAST_ADDR:Number = 0;
+    private static const BROADCAST_ALL:Number = 0;
 
     private static const HANDSHAKE_SIZE:Number = 8;
     private static const HANDSHAKE_RESP_SIZE:Number = 5;
@@ -76,7 +76,7 @@ package hydna.net {
     private var _openChannels:Dictionary;
     private var _openWaitQueue:Dictionary;
 
-    private var _streamRefCount:Number = 0;
+    private var _channelRefCount:Number = 0;
 
     {
       availableSockets = new Dictionary();
@@ -128,53 +128,53 @@ package hydna.net {
       return _handshaked;
     }
 
-    // Internal method to keep track of no of streams that is associated
+    // Internal method to keep track of no of channels that is associated
     // with this connection instance.
     internal function allocChannel() : void {
-      _streamRefCount++;
+      _channelRefCount++;
     }
 
     // Decrease the reference count
-    internal function deallocChannel(ch:uint=0) : void {
+    internal function deallocChannel(id:uint=0) : void {
 
-      if (ch != 0 && _openChannels) {
-        delete _openChannels[ch];
+      if (id != 0 && _openChannels) {
+        delete _openChannels[id];
       }
 
-      if (--_streamRefCount == 0) {
+      if (--_channelRefCount == 0) {
         destroy();
       }
     }
 
-    // Request to open a stream. Return true if request went well, else
+    // Request to open a channel. Return true if request went well, else
     // false.
     internal function requestOpen(request:OpenRequest) : Boolean {
-      var ch:uint = request.ch;
+      var id:uint = request.id;
       var queue:Array;
 
-      if (_openChannels[ch]) {
+      if (_openChannels[id]) {
         return false;
       }
 
-      if (_pendingOpenRequests[ch]) {
+      if (_pendingOpenRequests[id]) {
 
-        queue = _openWaitQueue[ch] as Array;
+        queue = _openWaitQueue[id] as Array;
 
         if (!queue) {
-          _openWaitQueue[ch] = queue = new Array();
+          _openWaitQueue[id] = queue = new Array();
         }
 
         queue.push(request);
 
       } else if (!_handshaked) {
-        _pendingOpenRequests[ch] = request;
+        _pendingOpenRequests[id] = request;
         if (!_connecting) {
           _connecting = true;
           connect(_host, _port);
         }
       } else {
-        _pendingOpenRequests[ch] = request;
-        writeBytes(request.packet);
+        _pendingOpenRequests[id] = request;
+        writeBytes(request.frame);
         request.sent = true;
 
         try {
@@ -191,7 +191,7 @@ package hydna.net {
     // Try to cancel an open request. Returns true on success else
     // false.
     internal function cancelOpen(request:OpenRequest) : Boolean {
-      var ch:uint = request.ch;
+      var id:uint = request.id;
       var queue:Array;
       var index:Number;
 
@@ -199,13 +199,13 @@ package hydna.net {
         return false;
       }
 
-      queue = _openWaitQueue[ch] as Array;
+      queue = _openWaitQueue[id] as Array;
 
-      if (_pendingOpenRequests[ch]) {
-        delete _pendingOpenRequests[ch];
+      if (_pendingOpenRequests[id]) {
+        delete _pendingOpenRequests[id];
 
         if (queue != null && queue.length)  {
-          _pendingOpenRequests[ch] = queue.pop();
+          _pendingOpenRequests[id] = queue.pop();
         }
 
         return true;
@@ -295,9 +295,9 @@ package hydna.net {
 
     // Handles all incomming data.
     private function receiveHandler(event:ProgressEvent) : void {
-      var stream:Channel = null;
+      var channel:Channel = null;
       var size:uint;
-      var ch:uint;
+      var id:uint;
       var op:Number;
       var flag:Number;
       var payload:ByteArray;
@@ -313,7 +313,7 @@ package hydna.net {
         }
 
         _receiveBuffer.readUnsignedByte(); // Reserved
-        ch = _receiveBuffer.readUnsignedInt();
+        id = _receiveBuffer.readUnsignedInt();
         op = _receiveBuffer.readUnsignedByte();
         flag = (op & 0xf);
 
@@ -325,15 +325,15 @@ package hydna.net {
         switch ((op >> 4)) {
 
           case Frame.OPEN:
-            processOpenFrame(ch, flag, payload);
+            processOpenFrame(id, flag, payload);
             break;
 
           case Frame.DATA:
-            processDataFrame(ch, flag, payload);
+            processDataFrame(id, flag, payload);
             break;
 
           case Frame.SIGNAL:
-            processSignalFrame(ch, flag, payload);
+            processSignalFrame(id, flag, payload);
             break;
         }
       }
@@ -344,15 +344,15 @@ package hydna.net {
     }
 
     // process an open packet
-    private function processOpenFrame( ch:uint
-                                      , flag:Number
-                                      , payload:ByteArray) : void {
+    private function processOpenFrame(id:uint,
+                                      flag:Number,
+                                      payload:ByteArray) : void {
       var request:OpenRequest;
-      var stream:Channel;
-      var redirectch:uint;
+      var channel:Channel;
+      var redirectid:uint;
       var event:Event;
 
-      request = OpenRequest(_pendingOpenRequests[ch]);
+      request = OpenRequest(_pendingOpenRequests[id]);
 
       if (request == null) {
         event = new ChannelErrorEvent("Server sent invalid open packet");
@@ -360,13 +360,13 @@ package hydna.net {
         return;
       }
 
-      stream = request.stream;
+      channel = request.channel;
 
       switch (flag) {
 
         case Frame.OPEN_SUCCESS:
-          _openChannels[ch] = stream;
-          stream.openSuccess(request.ch);
+          _openChannels[id] = channel;
+          channel.openSuccess(request.id);
           break;
 
         case Frame.OPEN_REDIRECT:
@@ -376,15 +376,15 @@ package hydna.net {
             return;
           }
 
-          redirectch = payload.readUnsignedInt();
+          redirectid = payload.readUnsignedInt();
 
-          if (_openChannels[redirectch]) {
-            destroy(new ChannelErrorEvent("Server redirected to open stream"));
+          if (_openChannels[redirectid]) {
+            destroy(new ChannelErrorEvent("Server redirected to open channel"));
             return;
           }
 
-          _openChannels[redirectch] = stream;
-          stream.openSuccess(redirectch);
+          _openChannels[redirectid] = channel;
+          channel.openSuccess(redirectid);
           break;
 
         case Frame.OPEN_FAIL_NA:
@@ -396,7 +396,7 @@ package hydna.net {
         case Frame.OPEN_FAIL_SERVICE_ERR:
         case Frame.OPEN_FAIL_OTHER:
           event = ChannelErrorEvent.fromOpenError(flag, payload);
-          stream.destroy(event);
+          channel.destroy(event);
           break;
 
         default:
@@ -404,26 +404,26 @@ package hydna.net {
           return;
       }
 
-      if (_openWaitQueue[ch] && _openWaitQueue[ch].length) {
+      if (_openWaitQueue[id] && _openWaitQueue[id].length) {
 
         // Destroy all pending request IF response wasn't a
-        // redirected stream.
-        if (flag == Frame.OPEN_REDIRECT && redirectch == ch) {
-          delete _pendingOpenRequests[ch];
+        // redirected channel.
+        if (flag == Frame.OPEN_REDIRECT && redirectid == id) {
+          delete _pendingOpenRequests[id];
 
           event = new ChannelErrorEvent("Channel already open");
 
-          while ((request = OpenRequest(_openWaitQueue[ch].pop()))) {
-            request.stream.destroy(event);
+          while ((request = OpenRequest(_openWaitQueue[id].pop()))) {
+            request.channel.destroy(event);
           }
           return;
         }
 
-        request = _openWaitQueue[ch].pop();
-        _pendingOpenRequests[ch] = request;
+        request = _openWaitQueue[id].pop();
+        _pendingOpenRequests[id] = request;
 
-        if (!_openWaitQueue[ch].length) {
-          delete _openWaitQueue[ch];
+        if (!_openWaitQueue[id].length) {
+          delete _openWaitQueue[id];
         }
 
         writeBytes(request.packet);
@@ -436,16 +436,16 @@ package hydna.net {
         }
 
       } else {
-        delete _pendingOpenRequests[ch];
+        delete _pendingOpenRequests[id];
       }
 
     }
 
     // process a data packet
-    private function processDataFrame( ch:uint
-                                      , flag:Number
-                                      , payload:ByteArray) : void {
-      var stream:Channel;
+    private function processDataFrame(id:uint,
+                                      flag:Number,
+                                      payload:ByteArray) : void {
+      var channel:Channel;
       var event:Event;
       var packet:Frame;
 
@@ -454,55 +454,55 @@ package hydna.net {
         return;
       }
 
-      if (ch == BROADCAST_ADDR) {
+      if (id == BROADCAST_ALL) {
         for (var key:String in _openChannels) {
           event = new ChannelDataEvent(flag, payload);
-          stream = Channel(_openChannels[key]);
-          stream.dispatchEvent(event);
+          channel = Channel(_openChannels[key]);
+          channel.dispatchEvent(event);
         }
       } else {
-        stream = Channel(_openChannels[ch]);
+        channel = Channel(_openChannels[id]);
 
-        if (stream == null) {
-          destroy(new ChannelErrorEvent("Frame sent to unknown stream"));
+        if (channel == null) {
+          destroy(new ChannelErrorEvent("Frame sent to unknown channel"));
           return;
         }
 
         event = new ChannelDataEvent(flag, payload);
 
-        stream.dispatchEvent(event);
+        channel.dispatchEvent(event);
       }
     }
 
     // process a signal packet
-    private function processSignalFrame( ch:uint
-                                        , flag:Number
-                                        , payload:ByteArray) : void {
+    private function processSignalFrame(id:uint,
+                                        flag:Number,
+                                        payload:ByteArray) : void {
       var event:Event = null;
-      var stream:Channel;
+      var channel:Channel;
       var packet:Frame;
 
       switch (flag) {
 
         case Frame.SIG_EMIT:
 
-          if (ch == BROADCAST_ADDR) {
+          if (id == BROADCAST_ALL) {
             for (var key:String in _openChannels) {
               event = new ChannelEmitEvent(payload);
-              stream = Channel(_openChannels[key]);
-              stream.dispatchEvent(event);
+              channel = Channel(_openChannels[key]);
+              channel.dispatchEvent(event);
             }
           } else {
             event = new ChannelEmitEvent(payload);
 
-            stream = Channel(_openChannels[ch]);
+            channel = Channel(_openChannels[id]);
 
-            if (stream == null) {
-              destroy(new ChannelErrorEvent("Frame sent to unknown stream"));
+            if (channel == null) {
+              destroy(new ChannelErrorEvent("Frame sent to unknown channel"));
               return;
             }
 
-            stream.dispatchEvent(event);
+            channel.dispatchEvent(event);
           }
           break;
 
@@ -521,21 +521,21 @@ package hydna.net {
             event = ChannelErrorEvent.fromSigError(flag, payload);
           }
 
-          if (ch == BROADCAST_ADDR) {
+          if (id == BROADCAST_ALL) {
             destroy(event);
           } else {
-            stream = Channel(_openChannels[ch]);
+            channel = Channel(_openChannels[id]);
 
-            if (stream == null) {
+            if (channel == null) {
               destroy(new ChannelErrorEvent("Received unknown channel"));
               return;
             }
 
-            if (stream.isClosing() == false) {
-              // We havent closed our stream yet. We therefor need to send
+            if (channel.isClosing() == false) {
+              // We havent closed our channel yet. We therefor need to send
               // and an ENDSIG in response to this packet.
 
-              packet = new Frame(ch, Frame.SIGNAL, Frame.SIG_END, payload);
+              packet = new Frame(id, Frame.SIGNAL, Frame.SIG_END, payload);
 
               try {
                 this.writeBytes(packet);
@@ -545,7 +545,7 @@ package hydna.net {
                 return;
               }
             } else {
-              stream.destroy(event);
+              channel.destroy(event);
             }
           }
           break;
@@ -577,13 +577,13 @@ package hydna.net {
       var event:Event = errorEvent;
       var pending:Dictionary = _pendingOpenRequests;
       var waitqueue:Dictionary = _openWaitQueue;
-      var openstreams:Dictionary = _openChannels;
+      var openchannels:Dictionary = _openChannels;
       var key:Object;
       var i:Number;
       var l:Number;
       var queue:Array;
 
-      if (openstreams == null) {
+      if (openchannels == null) {
         // Do not fire destroy multiple times.
 
         return;
@@ -607,7 +607,7 @@ package hydna.net {
 
       if (pending != null) {
         for (key in pending) {
-          OpenRequest(pending[key]).stream.destroy(event);
+          OpenRequest(pending[key]).channel.destroy(event);
         }
       }
 
@@ -615,13 +615,13 @@ package hydna.net {
         for (key in waitqueue) {
           queue = waitqueue[key] as Array;
           for (i = 0, l = queue.length; i < l; i++) {
-            OpenRequest(queue[i]).stream.destroy(event);
+            OpenRequest(queue[i]).channel.destroy(event);
           }
         }
       }
 
-      for (key in openstreams) {
-        Channel(openstreams[key]).destroy(event);
+      for (key in openchannels) {
+        Channel(openchannels[key]).destroy(event);
       }
 
       if (connected) {

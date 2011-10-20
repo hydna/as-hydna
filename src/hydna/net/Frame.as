@@ -79,12 +79,12 @@ package hydna.net {
     // Upper payload limit (10kb)
     internal static const PAYLOAD_MAX_LIMIT:Number = 10 * 1024;
 
-    public function Frame( ch:uint
-                          , op:uint
-                          , flag:uint=0
-                          , payload:ByteArray=null
-                          , offset:uint=0
-                          , length:uint=0) {
+    public function Frame(id:uint,
+                          op:uint,
+                          flag:uint=0,
+                          payload:ByteArray=null,
+                          offset:uint=0,
+                          length:uint=0) {
       var fixedOffset:Number = offset;
       var fixedLength:Number = length;
       var payloadLength:Number;
@@ -111,14 +111,14 @@ package hydna.net {
 
       writeShort(fixedLength + HEADER_SIZE);
       writeByte(0); // Reserved
-      writeUnsignedInt(ch);
+      writeUnsignedInt(id);
       writeByte(op << 4 | flag);
       if (payload != null) {
         writeBytes(payload, fixedOffset, fixedLength);
       }
     }
 
-    public function get channel() : uint {
+    public function get id() : uint {
       var pos:uint = this.position;
       var value:uint;
 
@@ -129,7 +129,7 @@ package hydna.net {
       return value;
     }
 
-    public function set channel(value:uint) : void {
+    public function set id(value:uint) : void {
       var pos:uint = this.position;
 
       this.position = 2;

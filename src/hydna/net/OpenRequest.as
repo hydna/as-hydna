@@ -42,29 +42,27 @@ package hydna.net {
   // Internal class to handle open requests.
   internal class OpenRequest {
 
-    internal var _stream:Channel;
-    internal var _ch:uint;
-    internal var _packet:Frame;
+    internal var _channel:Channel;
+    internal var _id:uint;
+    internal var _frame:Frame;
     internal var _sent:Boolean;
 
-    public function OpenRequest( stream:Channel
-                               , ch:uint
-                               , packet:Frame) {
-      _stream = stream;
-      _ch = ch;
-      _packet = packet;
+    public function OpenRequest(channel:Channel, id:uint, frame:Frame) {
+      _channel = channel;
+      _id = id;
+      _frame = frame;
     }
 
-    public function get stream() : Channel {
-      return _stream;
+    public function get channel() : Channel {
+      return _channel;
     }
 
-    public function get ch() : uint {
-      return _ch;
+    public function get id() : uint {
+      return _id;
     }
 
-    public function get packet() : Frame {
-      return _packet;
+    public function get frame() : Frame {
+      return _frame;
     }
 
     public function get sent() : Boolean {
