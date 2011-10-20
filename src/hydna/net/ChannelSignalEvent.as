@@ -1,4 +1,4 @@
-// ChannelEmitEvent.as
+// ChannelSignalEvent.as
 
 /**
  *        Copyright 2010 Hydna AB. All rights reserved.
@@ -37,20 +37,20 @@ package hydna.net {
   import flash.events.Event;
   import flash.utils.ByteArray;
 
-  public class ChannelEmitEvent extends Event {
+  public class ChannelSignalEvent extends Event {
 
-    public static const EMIT:String = "emit";
+    public static const SIGNAL:String = "signal";
 
     private var _message:String;
 
-    public function ChannelEmitEvent(message:String) {
-      super(EMIT, false, false);
+    public function ChannelSignalEvent(message:String) {
+      super(SIGNAL, false, false);
 
       _message = message;
     }
 
     /**
-     *  Returns the message associated with this ChannelEmitEvent instance.
+     *  Returns the message associated with this ChannelSignalEvent instance.
      */
     public function get message() : String {
       return _message;

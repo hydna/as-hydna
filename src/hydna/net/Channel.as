@@ -45,7 +45,7 @@ package hydna.net {
   import hydna.net.ChannelOpenEvent;
   import hydna.net.ChannelErrorEvent;
   import hydna.net.ChannelDataEvent;
-  import hydna.net.ChannelEmitEvent;
+  import hydna.net.ChannelSignalEvent;
   import hydna.net.Channel;
   import hydna.net.ChannelMode;
   import hydna.net.URLParser;

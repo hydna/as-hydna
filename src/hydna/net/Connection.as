@@ -49,7 +49,7 @@ package hydna.net {
   import hydna.net.Channel;
   import hydna.net.ChannelDataEvent;
   import hydna.net.ChannelErrorEvent;
-  import hydna.net.ChannelEmitEvent;
+  import hydna.net.ChannelSignalEvent;
   import hydna.net.ChannelCloseEvent;
   import hydna.net.URLParser;
 
@@ -630,7 +630,7 @@ package hydna.net {
       switch (flag) {
 
         case Frame.SIG_EMIT:
-          event = new ChannelEmitEvent(message);
+          event = new ChannelSignalEvent(message);
 
           if (id == BROADCAST_ALL) {
             for (var key:String in _openChannels) {
