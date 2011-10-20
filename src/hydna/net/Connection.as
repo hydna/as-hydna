@@ -39,6 +39,7 @@ package hydna.net {
   import flash.events.ProgressEvent;
   import flash.events.SecurityErrorEvent;
   import flash.errors.IOError;
+  import flash.errors.EOFError;
   import flash.net.Socket;
   import flash.utils.ByteArray;
   import flash.utils.Dictionary;
@@ -50,9 +51,13 @@ package hydna.net {
   import hydna.net.ChannelErrorEvent;
   import hydna.net.ChannelEmitEvent;
   import hydna.net.ChannelCloseEvent;
+  import hydna.net.URLParser;
 
   // Internal wrapper around flash.net.Socket
   internal class Connection extends Socket {
+
+    private static const MAX_REDIRECT_ATTEMPTS:Number = 5;
+    private static const DEFAULT_PORT:Number = 80;
 
     private static const BROADCAST_ALL:Number = 0;
 
@@ -64,13 +69,18 @@ package hydna.net {
 
     private static var availableSockets:Dictionary;
 
+    public static var followRedirects:Boolean = true;
+
+    private var _attempt:Number;
+    private var _handshakeBuffer:String;
+
     private var _connecting:Boolean = false;
     private var _handshaked:Boolean = false;
 
+    private var _id:String;
     private var _receiveBuffer:ByteArray;
-    private var _uri:String;
-    private var _host:String;
-    private var _port:Number;
+    private var _urlobj:Object;
+    private var _url:String;
 
     private var _pendingOpenRequests:Dictionary;
     private var _openChannels:Dictionary;
@@ -83,15 +93,23 @@ package hydna.net {
     }
 
     // Return an available connection or create a new one.
-    internal static function getSocket(host:String, port:Number) : Connection {
-      var uri:String = "hydna:" + host + ":" + port;
+    internal static function getConnection(url:String) : Connection {
+      var urlobj:Object = URLParser.parse(url);
       var connection:Connection;
+      var connid:String;
 
-      if (availableSockets[uri]) {
-        connection = availableSockets[uri];
+      connid = [
+        urlobj.host,
+        ":", (urlobj.port || DEFAULT_PORT),
+        "/", urlobj.path || ""
+      ].join("");
+
+      if (availableSockets[connid]) {
+        connection = availableSockets[connid];
       } else {
-        connection = new Connection(uri, host, port);
-        availableSockets[uri] = connection;
+        connection = new Connection(connid);
+        connection.handshake(urlobj);
+        availableSockets[connid] = connection;
       }
 
       return connection;
@@ -100,12 +118,10 @@ package hydna.net {
     /**
      *  Initializes a new Channel instance
      */
-    public function Connection(uri:String, host:String, port:Number) {
+    public function Connection(id:String) {
       super();
 
-      _uri = uri;
-      _host = host;
-      _port = port;
+      _id = id;
 
       _receiveBuffer = new ByteArray();
 
@@ -113,19 +129,183 @@ package hydna.net {
       _openChannels = new Dictionary();
       _openWaitQueue = new Dictionary();
 
-      addEventListener(Event.CONNECT, connectHandler);
       addEventListener(Event.CLOSE, closeHandler);
       addEventListener(IOErrorEvent.IO_ERROR, errorHandler);
       addEventListener(SecurityErrorEvent.SECURITY_ERROR,
                        securityErrorHandler);
     }
 
-    internal function get uri() : String {
-      return _uri;
+
+    internal function get id()  : String {
+      return _id;
     }
+
+
+    internal function get url() : String {
+      return _url;
+    }
+
 
     internal function get handshaked() : Boolean {
       return _handshaked;
+    }
+
+
+    internal function handshake(urlobj:Object) : void {
+
+      if (_connecting == true) {
+        throw new Error("Already connecting");
+      }
+
+      addEventListener(Event.CONNECT, connectHandler);
+      addEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
+
+      _urlobj = urlobj;
+
+      _attempt = _attempt ? _attempt + 1 : 1;
+      _handshakeBuffer = "";
+
+      _connecting = true;
+
+      connect(urlobj.host, urlobj.port || DEFAULT_PORT);
+    }
+
+
+    private function connectHandler(event:Event) : void {
+      var packet:Array = new Array();
+
+      removeEventListener(Event.CONNECT, connectHandler);
+
+      // TODO: Initialize a handshake timeout handler
+
+      packet[0] = "GET /" + (_urlobj.path || "") + " HTTP/1.1";
+      packet[1] = "Connection: Upgrade";
+      packet[2] = "Upgrade: winksock/1";
+      packet[3] = "Host: " + _urlobj.host;
+      packet[4] = "X-Accept-Redirects: " + (followRedirects ? "yes" : "no");
+      packet[5] = "\r\n";
+
+      this.writeMultiByte(packet.join("\r\n"), "us-ascii");
+
+      try {
+        flush();
+      } catch (error:Error) {
+        destroy(ChannelErrorEvent.fromError(error));
+        return;
+      }
+    }
+
+
+    private function handshakeHandler(event:ProgressEvent) : void {
+      var request:OpenRequest;
+      var buffer:String;
+      var splitted:Array;
+      var head:Array;
+      var body:String;
+      var headers:Array;
+      var m:Object;
+      var status:Number;
+
+      buffer = readUTFBytes(bytesAvailable);
+
+      _handshakeBuffer += buffer;
+
+      splitted = _handshakeBuffer.split("\r\n\r\n");
+
+      if (splitted.length == 1) {
+        // Need more bytes here, header end was not received yet.
+        return;
+      }
+
+      head = splitted[0].split("\r\n");
+      body = splitted[1];
+
+      if (body && body.indexOf("\r") != -1) {
+        body = body.substr(0, body.indexOf("\r"));
+      }
+
+      this.removeEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
+
+      m = /HTTP\/1\.1\s(\d+)/.exec(head[0]);
+
+      if (!m) {
+        destroy(new ChannelErrorEvent("Bad handshake (HTTP decoding)"));
+        return;
+      }
+
+      if (isNaN(status = int(m[1]))) {
+        destroy(new ChannelErrorEvent("Bad handshake (HTTP status missing)"));
+        return;
+      }
+
+      _connecting = false;
+
+      switch (status) {
+
+        case 101:
+          // Accepted and upgraded. Write all pending
+          // open requests to Socket.
+
+          // TODO: Add winksock/1 validation here!
+
+          _handshaked = true;
+
+          _receiveBuffer = new ByteArray();
+          this.addEventListener(ProgressEvent.SOCKET_DATA, receiveHandler);
+
+          for (var key:Object in _pendingOpenRequests) {
+            request = OpenRequest(_pendingOpenRequests[key]);
+            writeBytes(request.frame);
+            request.sent = true;
+          }
+
+          try {
+            flush();
+          } catch (error:Error) {
+            destroy(ChannelErrorEvent.fromError(error));
+          }
+
+          return;
+
+        case 300:
+        case 301:
+        case 302:
+        case 303:
+        case 304:
+
+          if (followRedirects == false) {
+            destroy(new ChannelErrorEvent("Bad handshake (" +
+                                          "HTTP-redirection is disabled" +
+                                          ")"));
+            return;
+          }
+
+          if (_attempt > MAX_REDIRECT_ATTEMPTS) {
+            destroy(new ChannelErrorEvent("Bad handshake (" +
+                                          "Too many redirect attempts" +
+                                          ")"));
+            return;
+          }
+
+          for (var i:Number = 1; i < head.length; i++) {
+            m = /(\.):\s+(|.)/.exec(head[i]);
+            if (m && m[1].toLowerCase() == "host") {
+              handshake(URLParser.parse(m[2]));
+              return;
+            }
+          }
+
+          destroy(new ChannelErrorEvent("Bad handshake (" +
+                                        "Expected 'host' in redirect" +
+                                        ")"));
+          return;
+
+        default:
+          destroy(new ChannelErrorEvent("Bad handshake (" +
+                                        status + " " + body +
+                                        ")"));
+          return;
+      }
     }
 
     // Internal method to keep track of no of channels that is associated
@@ -133,6 +313,7 @@ package hydna.net {
     internal function allocChannel() : void {
       _channelRefCount++;
     }
+
 
     // Decrease the reference count
     internal function deallocChannel(id:uint=0) : void {
@@ -145,6 +326,7 @@ package hydna.net {
         destroy();
       }
     }
+
 
     // Request to open a channel. Return true if request went well, else
     // false.
@@ -168,10 +350,6 @@ package hydna.net {
 
       } else if (!_handshaked) {
         _pendingOpenRequests[id] = request;
-        if (!_connecting) {
-          _connecting = true;
-          connect(_host, _port);
-        }
       } else {
         _pendingOpenRequests[id] = request;
         writeBytes(request.frame);
@@ -187,6 +365,7 @@ package hydna.net {
 
       return true;
     }
+
 
     // Try to cancel an open request. Returns true on success else
     // false.
@@ -226,72 +405,6 @@ package hydna.net {
       return false;
     }
 
-    //  Send a handshake packet and wait for a handshake
-    // response packet in return.
-    private function connectHandler(event:Event) : void {
-
-      addEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
-
-      writeMultiByte("DNA1", "us-acii");
-      writeByte(_host.length);
-      writeMultiByte(_host, "us-ascii");
-
-      try {
-        flush();
-      } catch (error:Error) {
-        destroy(ChannelErrorEvent.fromError(error));
-      }
-    }
-
-    // Handle the Handshake response packet.
-    private function handshakeHandler(event:ProgressEvent) : void {
-      var sentRequestCount:Number = 0;
-      var request:OpenRequest;
-      var code:Number;
-      var errevent:Event;
-
-      readBytes(_receiveBuffer, _receiveBuffer.length, bytesAvailable);
-
-      if (_receiveBuffer.length < HANDSHAKE_RESP_SIZE) {
-        return;
-      } else if (_receiveBuffer.length > HANDSHAKE_RESP_SIZE) {
-        errevent = new ChannelErrorEvent("Server responed with bad handshake");
-        dispatchEvent(errevent);
-        return;
-      }
-
-      if (_receiveBuffer.readMultiByte(HANDSHAKE_RESP_SIZE - 1, "us-acii")
-          !== "DNA1") {
-        errevent = new ChannelErrorEvent("Server responed with bad handshake");
-        dispatchEvent(errevent);
-        return;
-      }
-
-      if ((code = _receiveBuffer.readByte()) > 0) {
-        errevent = ChannelErrorEvent.fromHandshakeError(code);
-        dispatchEvent(errevent);
-        return;
-      }
-
-      _handshaked = true;
-      _connecting = false;
-
-      _receiveBuffer = new ByteArray();
-      removeEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
-      addEventListener(ProgressEvent.SOCKET_DATA, receiveHandler);
-
-      for (var key:Object in _pendingOpenRequests) {
-        request = OpenRequest(_pendingOpenRequests[key]);
-        writeBytes(request.packet);
-        request.sent = true;
-      }
-
-      try {
-        flush();
-      } catch (error:Error) {
-        destroy(ChannelErrorEvent.fromError(error));
-      }
-    }
 
     // Handles all incomming data.
     private function receiveHandler(event:ProgressEvent) : void {
@@ -300,6 +413,7 @@ package hydna.net {
       var id:uint;
       var op:Number;
       var flag:Number;
+      var desc:Number;
       var payload:ByteArray;
 
       readBytes(_receiveBuffer, _receiveBuffer.length, bytesAvailable);
@@ -312,17 +426,18 @@ package hydna.net {
           return;
         }
 
-        _receiveBuffer.readUnsignedByte(); // Reserved
         id = _receiveBuffer.readUnsignedInt();
-        op = _receiveBuffer.readUnsignedByte();
-        flag = (op & 0xf);
+        desc = _receiveBuffer.readUnsignedByte();
+
+        op = ((desc >> 1) & 0xf) >> 2;
+        flag = (desc << 1 & 0xf) >> 1;
 
         if (size - Frame.HEADER_SIZE) {
           payload = new ByteArray();
           _receiveBuffer.readBytes(payload, 0, size - Frame.HEADER_SIZE);
         }
 
-        switch ((op >> 4)) {
+        switch (op) {
 
           case Frame.OPEN:
             processOpenFrame(id, flag, payload);
@@ -351,6 +466,7 @@ package hydna.net {
       var channel:Channel;
       var redirectid:uint;
       var event:Event;
+      var message:String;
 
       request = OpenRequest(_pendingOpenRequests[id]);
 
@@ -365,8 +481,19 @@ package hydna.net {
       switch (flag) {
 
         case Frame.OPEN_SUCCESS:
+
+          if (payload && payload.length) {
+            try {
+              message = payload.readUTFBytes(payload.length);
+            } catch (err:EOFError) {
+              destroy(ChannelErrorEvent.fromError(err));
+              return;
+            }
+          }
+
           _openChannels[id] = channel;
-          channel.openSuccess(request.id);
+
+          channel.openSuccess(request.id, message);
           break;
 
         case Frame.OPEN_REDIRECT:
@@ -378,29 +505,38 @@ package hydna.net {
 
           redirectid = payload.readUnsignedInt();
 
+          if (payload.length > 4) {
+            try {
+              message = payload.readUTFBytes(payload.length - 4);
+            } catch (err:EOFError) {
+              destroy(ChannelErrorEvent.fromError(err));
+              return;
+            }
+          }
+
           if (_openChannels[redirectid]) {
             destroy(new ChannelErrorEvent("Server redirected to open channel"));
             return;
           }
 
           _openChannels[redirectid] = channel;
-          channel.openSuccess(redirectid);
-          break;
 
-        case Frame.OPEN_FAIL_NA:
-        case Frame.OPEN_FAIL_MODE:
-        case Frame.OPEN_FAIL_PROTOCOL:
-        case Frame.OPEN_FAIL_HOST:
-        case Frame.OPEN_FAIL_AUTH:
-        case Frame.OPEN_FAIL_SERVICE_NA:
-        case Frame.OPEN_FAIL_SERVICE_ERR:
-        case Frame.OPEN_FAIL_OTHER:
-          event = ChannelErrorEvent.fromOpenError(flag, payload);
-          channel.destroy(event);
+          channel.openSuccess(redirectid, message);
           break;
 
         default:
-          destroy(new ChannelErrorEvent("Server sent an unknown packet flag"));
+
+          if (payload && payload.length) {
+            try {
+              message = payload.readUTFBytes(payload.length);
+            } catch (err:EOFError) {
+              destroy(ChannelErrorEvent.fromError(err));
+              return;
+            }
+          }
+
+          event = new ChannelErrorEvent(message || "Denied to open channel");
+          channel.destroy(event);
           return;
       }
 
@@ -426,7 +562,7 @@ package hydna.net {
           delete _openWaitQueue[id];
         }
 
-        writeBytes(request.packet);
+        writeBytes(request.frame);
         request.sent = true;
 
         try {
@@ -464,7 +600,6 @@ package hydna.net {
         channel = Channel(_openChannels[id]);
 
         if (channel == null) {
-          destroy(new ChannelErrorEvent("Frame sent to unknown channel"));
           return;
         }
 
@@ -481,44 +616,44 @@ package hydna.net {
       var event:Event = null;
       var channel:Channel;
       var packet:Frame;
+      var message:String;
+
+      if (payload && payload.length) {
+        try {
+          message = payload.readUTFBytes(payload.length);
+        } catch (err:EOFError) {
+          destroy(ChannelErrorEvent.fromError(err));
+          return;
+        }
+      }
 
       switch (flag) {
 
         case Frame.SIG_EMIT:
+          event = new ChannelEmitEvent(message);
 
           if (id == BROADCAST_ALL) {
             for (var key:String in _openChannels) {
-              event = new ChannelEmitEvent(payload);
               channel = Channel(_openChannels[key]);
               channel.dispatchEvent(event);
             }
           } else {
-            event = new ChannelEmitEvent(payload);
-
             channel = Channel(_openChannels[id]);
-
             if (channel == null) {
-              destroy(new ChannelErrorEvent("Frame sent to unknown channel"));
               return;
             }
-
             channel.dispatchEvent(event);
           }
           break;
 
         case Frame.SIG_END:
 
-          event = new ChannelCloseEvent(payload);
+          event = new ChannelCloseEvent(message);
 
-        case Frame.SIG_ERR_PROTOCOL:
-        case Frame.SIG_ERR_OPERATION:
-        case Frame.SIG_ERR_LIMIT:
-        case Frame.SIG_ERR_SERVER:
-        case Frame.SIG_ERR_VIOLATION:
-        case Frame.SIG_ERR_OTHER:
+        default:
 
           if (event == null) {
-            event = ChannelErrorEvent.fromSigError(flag, payload);
+            event = new ChannelErrorEvent(message);
           }
 
           if (id == BROADCAST_ALL) {
@@ -527,7 +662,6 @@ package hydna.net {
             channel = Channel(_openChannels[id]);
 
             if (channel == null) {
-              destroy(new ChannelErrorEvent("Received unknown channel"));
               return;
             }
 
@@ -549,11 +683,6 @@ package hydna.net {
             }
           }
           break;
-
-        default:
-          destroy(new ChannelErrorEvent("Received unknown packet flag"));
-          break;
-
       }
 
     }
@@ -628,9 +757,8 @@ package hydna.net {
         close();
       }
 
-
-      if (availableSockets[_uri]) {
-        delete availableSockets[_uri];
+      if (availableSockets[_id]) {
+        delete availableSockets[_id];
       }
 
     }

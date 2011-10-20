@@ -42,23 +42,43 @@ package hydna.net {
   import flash.utils.ByteArray;
   import flash.utils.Dictionary;
 
+  import hydna.net.ChannelOpenEvent;
   import hydna.net.ChannelErrorEvent;
   import hydna.net.ChannelDataEvent;
   import hydna.net.ChannelEmitEvent;
   import hydna.net.Channel;
   import hydna.net.ChannelMode;
+  import hydna.net.URLParser;
 
   public class Channel extends EventDispatcher {
 
-    private static const DEFAULT_PORT:Number = 7010;
-    private static const URI_RE:RegExp = /(?:hydna:){0,1}([\w\-\.]+)(?::(\d+)){0,1}(?:\/(\d+|x[a-fA-F0-9]+){0,1}){0,1}(?:\?(.+)){0,1}/;
+    public static var PAYLOAD_MAX_SIZE:Number = Frame.PAYLOAD_MAX_SIZE;
+
+    /**
+     *  Indicates if HTTP-redirects should be
+     *  followed or not.
+     *
+     */
+    public function get followRedirects() : Boolean {
+      return Connection.followRedirects;
+    }
+
+
+    /**
+     *  @Returns {Boolean} true if HTTP-redirects should be
+     *  followed, else false.
+     */
+    public function set followRedirects(value:Boolean) : void {
+      Connection.followRedirects = value;
+    }
+
 
     private var _id:uint = 0;
-    private var _uri:String = null;
+    private var _url:String = null;
     private var _token:String = null;
     private var _closing:Boolean = false;
 
-    private var connection:Connection = null;
+    private var _connection:Connection = null;
     private var _connected:Boolean = false;
     private var _pendingClose:Frame = null;
 
@@ -69,6 +89,7 @@ package hydna.net {
     private var _mode:Number;
 
     private var _openRequest:OpenRequest;
+
 
     /**
      *  Returns the ID of this Channel instance.
@@ -118,13 +139,13 @@ package hydna.net {
      *
      *  @return {String} the specified hostname.
      */
-    public function get uri() : String {
+    public function get url() : String {
 
-      if (!_uri) {
-        _uri = connection.uri + "/" + _id + (_token ? "?" + _token : "");
+      if (!_url) {
+        _url = _connection.url + "/" + _id + (_token ? "?" + _token : "");
       }
 
-      return _uri;
+      return _url;
     }
 
     /**
@@ -146,77 +167,62 @@ package hydna.net {
      *  in the application security sandbox. For more information, see the
      *  "Flash Player Security" chapter in Programming ActionScript 3.0.
      */
-    public function connect(uri:String,
-                            mode:Number=ChannelMode.READ,
-                            token:ByteArray=null,
-                            tokenOffset:uint=0,
-                            tokenLength:uint=0) : void {
-      var m:Array;
+    public function connect(url:String, mode:Number=ChannelMode.READ) : void {
+      var connurl:String;
+      var urlobj:Object;
       var frame:Frame;
       var request:OpenRequest;
-      var tokenb:ByteArray = null;
-      var tokeno:uint = 0;
-      var tokenl:uint = 0;
+      var token:ByteArray = null;
       var id:Number;
-      var host:String;
-      var port:Number;
 
-      if (connection) {
+      if (_connection) {
         throw new Error("Already connected");
       }
 
-      if (uri == null) {
-        throw new Error("Expected `uri`");
+      if (url == null) {
+        throw new Error("Expected `url`");
       }
 
-      m = URI_RE.exec(uri);
+      if (/^http:|^https:/.test(url) == false) {
+        url = "http://" + url;
+      }
 
-      host = m[1];
-      port = m[2] || DEFAULT_PORT;
+      urlobj = URLParser.parse(url);
 
-      if (!host) {
+      if (urlobj.protocol == "https") {
+        throw new Error("Protocol HTTPS is currently not supported");
+      }
+
+      if (urlobj.protocol !== "http") {
+        throw new Error("Unsupported protocol, expected HTTP/HTTPS");
+      }
+
+      if (!urlobj.host) {
         throw new Error("Expected hostname");
       }
 
-      if (host.length > 256) {
+      if (urlobj.host.length > 256) {
         throw new Error("Hostname must not exceed 256 characters");
       }
 
-      if (m[3]) {
-        if (m[3].charAt(0) == "x") {
-          id = parseInt("0" + m[3]);
-        } else {
-          id = parseInt(m[3]);
-        }
+      if (urlobj.path) {
+        id = parseInt((urlobj.path.charAt(0) == "x" ? "0" : "") + urlobj.path);
       } else {
         id = 1;
       }
 
-      if (id == 0 || id > 0xFFFFFFFF) {
+      if (id < 1 || id > 0xFFFFFFFF) {
         throw new Error("Out of range, expected channel id" +
                         "between 0x1 and 0xFFFFFFFF");
       }
 
-      if (token != null) {
-        tokenb = token;
-        tokeno = tokenOffset;
-        tokenl = tokenLength;
-      } else if (m[4]) {
-        tokenb = new ByteArray();
-        tokenb.writeMultiByte(decodeURIComponent(m[4]), "us-ascii");
-        tokenb.position = 0;
-        tokeno = 0;
-        tokenl = tokenb.length;
-      }
-
-      if (tokenb != null) {
-        _token = encodeURIComponent(
-                  tokenb.readMultiByte(tokenb.length, "us-ascii"));
-        tokenb.position = 0;
+      if (urlobj.paramStr) {
+        token = new ByteArray();
+        token.writeUTFBytes(decodeURIComponent(urlobj.paramStr));
       }
 
       if (mode < 0 || mode > ChannelMode.READWRITEEMIT) {
-        throw new Error("Invalid channel mode");
+        throw new Error("Invalid mode");
       }
 
       _mode = mode;
@@ -225,17 +231,27 @@ package hydna.net {
       _writable = ((_mode & ChannelMode.WRITE) == ChannelMode.WRITE);
       _emitable = ((_mode & ChannelMode.EMIT) == ChannelMode.EMIT);
 
-      connection = Connection.getSocket(host, port);
+      connurl = urlobj.protocol + "://" + urlobj.host;
+
+      if (urlobj.port) {
+        connurl += ":" + urlobj.port;
+      }
+
+      if (urlobj.auth) {
+        connurl += "/" + urlobj.auth;
+      }
+
+      _connection = Connection.getConnection(connurl);
 
       // Ref count
-      connection.allocChannel();
+      _connection.allocChannel();
 
-      frame = new Frame(id, Frame.OPEN, mode, tokenb, tokeno, tokenl);
+      frame = new Frame(id, Frame.OPEN, mode, token);
 
       request = new OpenRequest(this, id, frame);
 
-      if (connection.requestOpen(request) == false) {
-        throw new Error("Channel already open");
+      if (_connection.requestOpen(request) == false) {
+        throw new Error("Channel is already open");
       }
 
       _openRequest = request;
@@ -260,7 +276,7 @@ package hydna.net {
                                priority:uint=1) : void {
       var frame:Frame;
 
-      if (connected == false || connection == null) {
+      if (connected == false || _connection == null) {
         throw new IOError("Channel is not connected.");
       }
 
@@ -274,8 +290,8 @@ package hydna.net {
 
       frame = new Frame(_id, Frame.DATA, priority, data, offset, length);
 
-      connection.writeBytes(frame);
-      connection.flush();
+      _connection.writeBytes(frame);
+      _connection.flush();
     }
 
     /**
@@ -312,12 +328,11 @@ package hydna.net {
      *
      *  @param value The string to write to the channel.
      */
-    public function emit(data:ByteArray,
-                         offset:uint=0,
-                         length:uint=0) : void {
+    public function emit(message:String=null) : void {
       var frame:Frame;
+      var data:ByteArray;
 
-      if (connected == false || connection == null) {
+      if (connected == false || _connection == null) {
         throw new IOError("Channel is not connected.");
       }
 
@@ -325,23 +340,17 @@ package hydna.net {
         throw new Error("You do not have permission to send signals");
       }
 
-      frame = new Frame(_id, Frame.SIGNAL, Frame.SIG_EMIT, data, offset, length);
+      if (message !== null) {
+        data = new ByteArray();
+        data.writeUTFBytes(message);
+      }
 
-      connection.writeBytes(frame);
-      connection.flush();
+      frame = new Frame(_id, Frame.SIGNAL, Frame.SIG_EMIT, data);
+
+      _connection.writeBytes(frame);
+      _connection.flush();
     }
 
-    /**
-     *  Emit's an UTF-8 signal to the channel.
-     *
-     *  @param value The string to emit to the channel.
-     *  @param type An optional type for the signal.
-     */
-    public function emitUTFBytes(value:String, type:Number=0) : void {
-      var data:ByteArray = new ByteArray();
-      data.writeUTFBytes(value);
-      emit(data);
-    }
 
     /**
      *  Closes the Channel instance.
@@ -350,9 +359,9 @@ package hydna.net {
      */
     public function close(message:String=null) : void {
       var frame:Frame;
-      var payload:ByteArray;
+      var data:ByteArray;
 
-      if (connection == null || _closing) {
+      if (_connection == null || _closing) {
         return;
       }
 
@@ -362,11 +371,11 @@ package hydna.net {
       _emitable = false;
 
       if (message != null) {
-        payload = new ByteArray();
-        payload.writeUTFBytes(message);
+        data = new ByteArray();
+        data.writeUTFBytes(message);
       }
 
-      if (_openRequest != null && connection.cancelOpen(_openRequest)) {
+      if (_openRequest != null && _connection.cancelOpen(_openRequest)) {
         // Open request hasn't been posted yet, which means that it's
         // safe to destroy channel immediately.
 
@@ -375,7 +384,7 @@ package hydna.net {
         return;
       }
 
-      frame = new Frame(_id, Frame.SIGNAL, Frame.SIG_END, payload);
+      frame = new Frame(_id, Frame.SIGNAL, Frame.SIG_END, data);
 
       if (_openRequest != null) {
         // Open request is not responded to yet. Wait to send ENDSIG until
@@ -384,8 +393,8 @@ package hydna.net {
         _pendingClose = frame;
       } else {
         try {
-          connection.writeBytes(frame);
-          connection.flush();
+          _connection.writeBytes(frame);
+          _connection.flush();
         } catch (error:IOError) {
           destroy(ChannelErrorEvent.fromError(error));
         }
@@ -397,7 +406,7 @@ package hydna.net {
     }
 
     // Internal callback for open success
-    internal function openSuccess(respid:uint) : void {
+    internal function openSuccess(respid:uint, message:String=null) : void {
       var origid:uint = _id;
       var frame:Frame;
 
@@ -418,8 +427,8 @@ package hydna.net {
         }
 
         try {
-          connection.writeBytes(frame);
-          connection.flush();
+          _connection.writeBytes(frame);
+          _connection.flush();
         } catch (error:IOError) {
           // Something wen't terrible wrong. Queue frame and wait
           // for a reconnect.
@@ -427,13 +436,13 @@ package hydna.net {
           destroy(ChannelErrorEvent.fromError(error));
         }
       } else {
-        dispatchEvent(new Event(Event.CONNECT));
+        dispatchEvent(new ChannelOpenEvent(message));
       }
     }
 
     // Internally destroy connection.
     internal function destroy(event:Event=null) : void {
-      var connection:Connection = connection;
+      var connection:Connection = _connection;
       var connected:Boolean = _connected;
       var id:uint = _id;
 
@@ -444,11 +453,13 @@ package hydna.net {
       _pendingClose = null;
       _closing = false;
       _pendingClose = null;
-      connection = null;
 
-      if (connection) {
-        connection.deallocChannel(connected ? id : 0);
+
+      if (_connection) {
+        _connection.deallocChannel(connected ? id : 0);
+        _connection = null;
       }
+
 
       if (event != null) {
         dispatchEvent(event);

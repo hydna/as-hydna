@@ -41,23 +41,19 @@ package hydna.net {
 
     public static const EMIT:String = "emit";
 
-    private var _data:ByteArray;
+    private var _message:String;
 
-    public function ChannelEmitEvent(data:ByteArray) {
+    public function ChannelEmitEvent(message:String) {
       super(EMIT, false, false);
 
-      if (data == null) {
-        _data = new ByteArray();
-      } else {
-        _data = data;
-      }
+      _message = message;
     }
 
     /**
-     *  Returns the data associated with this ChannelEmitEvent instance.
+     *  Returns the message associated with this ChannelEmitEvent instance.
      */
-    public function get data() : ByteArray {
-      return _data;
+    public function get message() : String {
+      return _message;
     }
 
   }

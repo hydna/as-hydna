@@ -37,19 +37,19 @@ package hydna.net {
   import flash.events.Event;
   import flash.utils.ByteArray;
 
-  public class ChannelCloseEvent extends Event {
+  public class ChannelOpenEvent extends Event {
 
-    public static const CLOSE:String = "close";
+    public static const OPEN:String = "open";
 
     private var _message:String = null;
 
-    public function ChannelCloseEvent(message:String) {
-      super(CLOSE, false, false);
+    public function ChannelOpenEvent(message:String) {
+      super(OPEN, false, false);
       _message = message;
     }
 
     /**
-     *  Returns the message associated with this ChannelCloseEvent instance.
+     *  Returns the message associated with this ChannelOpenEvent instance.
      */
     public function get message() : String {
       return _message;
