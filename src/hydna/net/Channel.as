@@ -58,7 +58,7 @@ package hydna.net {
     private var _token:String = null;
     private var _closing:Boolean = false;
 
-    private var _socket:Connection = null;
+    private var connection:Connection = null;
     private var _connected:Boolean = false;
     private var _pendingClose:Frame = null;
 
@@ -121,7 +121,7 @@ package hydna.net {
     public function get uri() : String {
 
       if (!_uri) {
-        _uri = _socket.uri + "/" + _id + (_token ? "?" + _token : "");
+        _uri = connection.uri + "/" + _id + (_token ? "?" + _token : "");
       }
 
       return _uri;
@@ -132,16 +132,16 @@ package hydna.net {
      *  immediately, either an event is dispatched or an exception is thrown:
      *  an error event is dispatched if a host was specified, and an exception
      *  is thrown if no host was specified. Otherwise, the status of the
-     *  connection is reported by an event. If the socket is already
+     *  connection is reported by an event. If the connection is already
      *  connected, the existing connection is closed first.
      *
      *  By default, the value you pass for host must be in the same domain
      *  and the value you pass for port must be 1024 or higher. For example,
      *  a SWF file at adobe.com can connect only to a server daemon running
-     *  at adobe.com. If you want to connect to a socket on a different host
+     *  at adobe.com. If you want to connect to a connection on a different host
      *  than the one from which the connecting SWF file was served, or if you
      *  want to connect to a port lower than 1024 on any host, you must
-     *  obtain an xmlsocket: policy file from the host to which you are
+     *  obtain an xmlconnection: policy file from the host to which you are
      *  connecting. Howver, these restrictions do not exist for AIR content
      *  in the application security sandbox. For more information, see the
      *  "Flash Player Security" chapter in Programming ActionScript 3.0.
@@ -161,7 +161,7 @@ package hydna.net {
       var host:String;
       var port:Number;
 
-      if (_socket) {
+      if (connection) {
         throw new Error("Already connected");
       }
 
@@ -225,16 +225,16 @@ package hydna.net {
       _writable = ((_mode & ChannelMode.WRITE) == ChannelMode.WRITE);
       _emitable = ((_mode & ChannelMode.EMIT) == ChannelMode.EMIT);
 
-      _socket = Connection.getSocket(host, port);
+      connection = Connection.getSocket(host, port);
 
       // Ref count
-      _socket.allocChannel();
+      connection.allocChannel();
 
       frame = new Frame(id, Frame.OPEN, mode, tokenb, tokeno, tokenl);
 
       request = new OpenRequest(this, id, frame);
 
-      if (_socket.requestOpen(request) == false) {
+      if (connection.requestOpen(request) == false) {
         throw new Error("Channel already open");
       }
 
@@ -260,7 +260,7 @@ package hydna.net {
                                priority:uint=1) : void {
       var frame:Frame;
 
-      if (connected == false || _socket == null) {
+      if (connected == false || connection == null) {
         throw new IOError("Channel is not connected.");
       }
 
@@ -274,12 +274,12 @@ package hydna.net {
 
       frame = new Frame(_id, Frame.DATA, priority, data, offset, length);
 
-      _socket.writeBytes(frame);
-      _socket.flush();
+      connection.writeBytes(frame);
+      connection.flush();
     }
 
     /**
-     *  Writes the following data to the socket: a 16-bit unsigned integer,
+     *  Writes the following data to the connection: a 16-bit unsigned integer,
      *  which indicates the length of the specified UTF-8 string in bytes,
      *  followed by the string itself.
      *
@@ -317,7 +317,7 @@ package hydna.net {
                          length:uint=0) : void {
       var frame:Frame;
 
-      if (connected == false || _socket == null) {
+      if (connected == false || connection == null) {
         throw new IOError("Channel is not connected.");
       }
 
@@ -327,8 +327,8 @@ package hydna.net {
 
       frame = new Frame(_id, Frame.SIGNAL, Frame.SIG_EMIT, data, offset, length);
 
-      _socket.writeBytes(frame);
-      _socket.flush();
+      connection.writeBytes(frame);
+      connection.flush();
     }
 
     /**
@@ -352,7 +352,7 @@ package hydna.net {
       var frame:Frame;
       var payload:ByteArray;
 
-      if (_socket == null || _closing) {
+      if (connection == null || _closing) {
         return;
       }
 
@@ -366,7 +366,7 @@ package hydna.net {
         payload.writeUTFBytes(message);
       }
 
-      if (_openRequest != null && _socket.cancelOpen(_openRequest)) {
+      if (_openRequest != null && connection.cancelOpen(_openRequest)) {
         // Open request hasn't been posted yet, which means that it's
         // safe to destroy channel immediately.
 
@@ -384,8 +384,8 @@ package hydna.net {
         _pendingClose = frame;
       } else {
         try {
-          _socket.writeBytes(frame);
-          _socket.flush();
+          connection.writeBytes(frame);
+          connection.flush();
         } catch (error:IOError) {
           destroy(ChannelErrorEvent.fromError(error));
         }
@@ -418,8 +418,8 @@ package hydna.net {
         }
 
         try {
-          _socket.writeBytes(frame);
-          _socket.flush();
+          connection.writeBytes(frame);
+          connection.flush();
         } catch (error:IOError) {
           // Something wen't terrible wrong. Queue frame and wait
           // for a reconnect.
@@ -431,9 +431,9 @@ package hydna.net {
       }
     }
 
-    // Internally destroy socket.
+    // Internally destroy connection.
     internal function destroy(event:Event=null) : void {
-      var socket:Connection = _socket;
+      var connection:Connection = connection;
       var connected:Boolean = _connected;
       var id:uint = _id;
 
@@ -444,10 +444,10 @@ package hydna.net {
       _pendingClose = null;
       _closing = false;
       _pendingClose = null;
-      _socket = null;
+      connection = null;
 
-      if (socket) {
-        socket.deallocChannel(connected ? id : 0);
+      if (connection) {
+        connection.deallocChannel(connected ? id : 0);
       }
 
       if (event != null) {

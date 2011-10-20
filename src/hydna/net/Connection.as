@@ -82,19 +82,19 @@ package hydna.net {
       availableSockets = new Dictionary();
     }
 
-    // Return an available socket or create a new one.
+    // Return an available connection or create a new one.
     internal static function getSocket(host:String, port:Number) : Connection {
       var uri:String = "hydna:" + host + ":" + port;
-      var socket:Connection;
+      var connection:Connection;
 
       if (availableSockets[uri]) {
-        socket = availableSockets[uri];
+        connection = availableSockets[uri];
       } else {
-        socket = new Connection(uri, host, port);
-        availableSockets[uri] = socket;
+        connection = new Connection(uri, host, port);
+        availableSockets[uri] = connection;
       }
 
-      return socket;
+      return connection;
     }
 
     /**
@@ -562,12 +562,12 @@ package hydna.net {
       destroy(new ChannelErrorEvent("Security error"));
     }
 
-    // Handles socket errors
+    // Handles connection errors
     private function errorHandler(event:IOErrorEvent) : void {
       destroy(ChannelErrorEvent.fromEvent(event));
     }
 
-    // Handles socket close
+    // Handles connection close
     private function closeHandler(event:Event) : void {
       destroy(new ChannelErrorEvent("Disconnected from server"));
     }
