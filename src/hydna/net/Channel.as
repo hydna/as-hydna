@@ -53,7 +53,7 @@ package hydna.net {
     private static const DEFAULT_PORT:Number = 7010;
     private static const URI_RE:RegExp = /(?:hydna:){0,1}([\w\-\.]+)(?::(\d+)){0,1}(?:\/(\d+|x[a-fA-F0-9]+){0,1}){0,1}(?:\?(.+)){0,1}/;
 
-    private var _ch:uint = 0;
+    private var _id:uint = 0;
     private var _uri:String = null;
     private var _token:String = null;
     private var _closing:Boolean = false;
@@ -70,6 +70,14 @@ package hydna.net {
 
     private var _openRequest:OpenRequest;
 
+    /**
+     *  Returns the ID of this Channel instance.
+     *
+     *  @return {Number} the specified ID number.
+     */
+    public function get id() : uint {
+      return _id;
+    }
 
     /**
      *  Initializes a new Channel instance
@@ -106,15 +114,6 @@ package hydna.net {
     }
 
     /**
-     *  Returns the channel that this instance listen to.
-     *
-     *  @return {Number} the specified channel number.
-     */
-    public function get channel() : Number {
-      return _ch;
-    }
-
-    /**
      *  Returns the url for this instance.
      *
      *  @return {String} the specified hostname.
@@ -122,7 +121,7 @@ package hydna.net {
     public function get uri() : String {
 
       if (!_uri) {
-        _uri = _socket.uri + "/" + _ch + (_token ? "?" + _token : "");
+        _uri = _socket.uri + "/" + _id + (_token ? "?" + _token : "");
       }
 
       return _uri;
@@ -147,18 +146,18 @@ package hydna.net {
      *  in the application security sandbox. For more information, see the
      *  "Flash Player Security" chapter in Programming ActionScript 3.0.
      */
-    public function connect( uri:String
-                           , mode:Number=ChannelMode.READ
-                           , token:ByteArray=null
-                           , tokenOffset:uint=0
-                           , tokenLength:uint=0) : void {
+    public function connect(uri:String,
+                            mode:Number=ChannelMode.READ,
+                            token:ByteArray=null,
+                            tokenOffset:uint=0,
+                            tokenLength:uint=0) : void {
       var m:Array;
-      var packet:Frame;
+      var frame:Frame;
       var request:OpenRequest;
       var tokenb:ByteArray = null;
       var tokeno:uint = 0;
       var tokenl:uint = 0;
-      var ch:Number;
+      var id:Number;
       var host:String;
       var port:Number;
 
@@ -185,16 +184,17 @@ package hydna.net {
 
       if (m[3]) {
         if (m[3].charAt(0) == "x") {
-          ch = parseInt("0" + m[3]);
+          id = parseInt("0" + m[3]);
         } else {
-          ch = parseInt(m[3]);
+          id = parseInt(m[3]);
         }
       } else {
-        ch = 1;
+        id = 1;
       }
 
-      if (ch == 0 || ch > 0xFFFFFFFF) {
-        throw new Error("Expected channel between x1 and xFFFFFFFF");
+      if (id == 0 || id > 0xFFFFFFFF) {
+        throw new Error("Out of range, expected channel id" +
+                        "between 0x1 and 0xFFFFFFFF");
       }
 
       if (token != null) {
@@ -230,9 +230,9 @@ package hydna.net {
       // Ref count
       _socket.allocChannel();
 
-      packet = new Frame(ch, Frame.OPEN, mode, tokenb, tokeno, tokenl);
+      frame = new Frame(id, Frame.OPEN, mode, tokenb, tokeno, tokenl);
 
-      request = new OpenRequest(this, ch, packet);
+      request = new OpenRequest(this, id, frame);
 
       if (_socket.requestOpen(request) == false) {
         throw new Error("Channel already open");
@@ -254,11 +254,11 @@ package hydna.net {
      *  <p>If offset or length is out of range, they are adjusted to match
      *  the beginning and end of the bytes array.</p>
      */
-    public function writeBytes( data:ByteArray
-                              , offset:uint=0
-                              , length:uint=0
-                              , priority:uint=1) : void {
-      var packet:Frame;
+    public function writeBytes(data:ByteArray,
+                               offset:uint=0,
+                               length:uint=0,
+                               priority:uint=1) : void {
+      var frame:Frame;
 
       if (connected == false || _socket == null) {
         throw new IOError("Channel is not connected.");
@@ -272,10 +272,9 @@ package hydna.net {
         throw new RangeError("Priority must be between 1 - 5");
       }
 
-      packet = new Frame( _ch, Frame.DATA, priority
-                         , data, offset, length);
+      frame = new Frame(_id, Frame.DATA, priority, data, offset, length);
 
-      _socket.writeBytes(packet);
+      _socket.writeBytes(frame);
       _socket.flush();
     }
 
@@ -313,10 +312,10 @@ package hydna.net {
      *
      *  @param value The string to write to the stream.
      */
-    public function emit( data:ByteArray
-                        , offset:uint=0
-                        , length:uint=0) : void {
-      var packet:Frame;
+    public function emit(data:ByteArray,
+                         offset:uint=0,
+                         length:uint=0) : void {
+      var frame:Frame;
 
       if (connected == false || _socket == null) {
         throw new IOError("Channel is not connected.");
@@ -326,10 +325,9 @@ package hydna.net {
         throw new Error("You do not have permission to send signals");
       }
 
-      packet = new Frame( _ch, Frame.SIGNAL, Frame.SIG_EMIT
-                         , data, offset, length);
+      frame = new Frame(_id, Frame.SIGNAL, Frame.SIG_EMIT, data, offset, length);
 
-      _socket.writeBytes(packet);
+      _socket.writeBytes(frame);
       _socket.flush();
     }
 
@@ -351,7 +349,7 @@ package hydna.net {
      *  @param message An optional message to send with the close signal.
      */
     public function close(message:String=null) : void {
-      var packet:Frame;
+      var frame:Frame;
       var payload:ByteArray;
 
       if (_socket == null || _closing) {
@@ -377,16 +375,16 @@ package hydna.net {
         return;
       }
 
-      packet = new Frame(_ch, Frame.SIGNAL, Frame.SIG_END, payload);
+      frame = new Frame(_id, Frame.SIGNAL, Frame.SIG_END, payload);
 
       if (_openRequest != null) {
         // Open request is not responded to yet. Wait to send ENDSIG until
         // we get an OPENRESP.
 
-        _pendingClose = packet;
+        _pendingClose = frame;
       } else {
         try {
-          _socket.writeBytes(packet);
+          _socket.writeBytes(frame);
           _socket.flush();
         } catch (error:IOError) {
           destroy(ChannelErrorEvent.fromError(error));
@@ -399,31 +397,31 @@ package hydna.net {
     }
 
     // Internal callback for open success
-    internal function openSuccess(respch:uint) : void {
-      var origch:uint = _ch;
-      var packet:Frame;
+    internal function openSuccess(respid:uint) : void {
+      var origid:uint = _id;
+      var frame:Frame;
 
       _openRequest = null;
-      _ch = respch;
+      _id = respid;
       _connected = true;
 
       if (_pendingClose) {
 
-        packet = _pendingClose;
+        frame = _pendingClose;
         _pendingClose = null;
 
-        if (origch != respch) {
+        if (origid != respid) {
           // channel is changed. We need to change the channel of the
-          //packet before sending to server.
+          // frame before sending to server.
 
-          packet.channel = respch;
+          frame.channel = respid;
         }
 
         try {
-          _socket.writeBytes(packet);
+          _socket.writeBytes(frame);
           _socket.flush();
         } catch (error:IOError) {
-          // Something wen't terrible wrong. Queue packet and wait
+          // Something wen't terrible wrong. Queue frame and wait
           // for a reconnect.
 
           destroy(ChannelErrorEvent.fromError(error));
@@ -437,9 +435,9 @@ package hydna.net {
     internal function destroy(event:Event=null) : void {
       var socket:Connection = _socket;
       var connected:Boolean = _connected;
-      var ch:uint = _ch;
+      var id:uint = _id;
 
-      _ch = 0;
+      _id = 0;
       _connected = false;
       _writable = false;
       _readable = false;
@@ -449,7 +447,7 @@ package hydna.net {
       _socket = null;
 
       if (socket) {
-        socket.deallocChannel(connected ? ch : 0);
+        socket.deallocChannel(connected ? id : 0);
       }
 
       if (event != null) {
