@@ -30,14 +30,14 @@
  *  those of the authors and should not be interpreted as representing 
  *  official policies, either expressed or implied, of Hydna AB.
  */
- 
+
 package hydna.net {
-  
+
   import flash.utils.ByteArray;
-  
+
   import hydna.net.Packet;
   import hydna.net.Stream;
-  
+
   // Internal class to handle open requests.
   internal class OpenRequest {
 
