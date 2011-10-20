@@ -70,23 +70,23 @@ package hydna.net {
       var msg:String;
 
       switch (flag) {
-        case Packet.HANDSHAKE_UNKNOWN:
-          code = Packet.HANDSHAKE_UNKNOWN;
+        case Frame.HANDSHAKE_UNKNOWN:
+          code = Frame.HANDSHAKE_UNKNOWN;
           msg = "Unknown handshake error";
           break;
-        case Packet.HANDSHAKE_SERVER_BUSY:
+        case Frame.HANDSHAKE_SERVER_BUSY:
           msg = "Handshake failed, server is busy";
           break;
-        case Packet.HANDSHAKE_BADFORMAT:
+        case Frame.HANDSHAKE_BADFORMAT:
           msg = "Handshake failed, bad format sent by client";
           break;
-        case Packet.HANDSHAKE_HOSTNAME:
+        case Frame.HANDSHAKE_HOSTNAME:
           msg = "Handshake failed, invalid hostname";
           break;
-        case Packet.HANDSHAKE_PROTOCOL:
+        case Frame.HANDSHAKE_PROTOCOL:
           msg = "Handshake failed, protocol not allowed";
           break;
-        case Packet.HANDSHAKE_SERVER_ERROR:
+        case Frame.HANDSHAKE_SERVER_ERROR:
           msg = "Handshake failed, server error";
           break;
       }
@@ -107,31 +107,31 @@ package hydna.net {
       }
 
       switch (code) {
-        case Packet.OPEN_FAIL_NA:
+        case Frame.OPEN_FAIL_NA:
           msg = msg || "Failed to open stream, not available";
           break;
-        case Packet.OPEN_FAIL_MODE:
+        case Frame.OPEN_FAIL_MODE:
           msg = msg || "Not allowed to open stream with specified mode";
           break;
-        case Packet.OPEN_FAIL_PROTOCOL:
+        case Frame.OPEN_FAIL_PROTOCOL:
           msg = msg || "Not allowed to open stream with specified protocol";
           break;
-        case Packet.OPEN_FAIL_HOST:
+        case Frame.OPEN_FAIL_HOST:
           msg = msg || "Not allowed to open stream from host";
           break;
-        case Packet.OPEN_FAIL_AUTH:
+        case Frame.OPEN_FAIL_AUTH:
           msg = msg || "Not allowed to open stream with credentials";
           break;
-        case Packet.OPEN_FAIL_SERVICE_NA:
+        case Frame.OPEN_FAIL_SERVICE_NA:
           msg = msg || "Failed to open stream, service is not available";
           break;
-        case Packet.OPEN_FAIL_SERVICE_ERR:
+        case Frame.OPEN_FAIL_SERVICE_ERR:
           msg = msg || "Failed to open stream, service error";
           break;
 
         default:
-        case Packet.OPEN_FAIL_OTHER:
-          code = Packet.OPEN_FAIL_OTHER;
+        case Frame.OPEN_FAIL_OTHER:
+          code = Frame.OPEN_FAIL_OTHER;
           msg = msg || "Failed to open stream, unknown error";
           break;
       }
@@ -152,25 +152,25 @@ package hydna.net {
       }
 
       switch (code) {
-        case Packet.SIG_ERR_PROTOCOL:
+        case Frame.SIG_ERR_PROTOCOL:
           msg = msg || "Protocol error";
           break;
-        case Packet.SIG_ERR_OPERATION:
+        case Frame.SIG_ERR_OPERATION:
           msg = msg || "Operational error";
           break;
-        case Packet.SIG_ERR_LIMIT:
+        case Frame.SIG_ERR_LIMIT:
           msg = msg || "Limit error";
           break;
-        case Packet.SIG_ERR_SERVER:
+        case Frame.SIG_ERR_SERVER:
           msg = msg || "Server error";
           break;
-        case Packet.SIG_ERR_VIOLATION:
+        case Frame.SIG_ERR_VIOLATION:
           msg = msg || "Violation error";
           break;
 
         default:
-        case Packet.SIG_ERR_OTHER:
-          code = Packet.SIG_ERR_OTHER;
+        case Frame.SIG_ERR_OTHER:
+          code = Frame.SIG_ERR_OTHER;
           msg = msg || "Unknown error";
           break;
       }

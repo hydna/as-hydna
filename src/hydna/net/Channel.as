@@ -60,7 +60,7 @@ package hydna.net {
 
     private var _socket:Connection = null;
     private var _connected:Boolean = false;
-    private var _pendingClose:Packet = null;
+    private var _pendingClose:Frame = null;
 
     private var _readable:Boolean = false;
     private var _writable:Boolean = false;
@@ -153,7 +153,7 @@ package hydna.net {
                            , tokenOffset:uint=0
                            , tokenLength:uint=0) : void {
       var m:Array;
-      var packet:Packet;
+      var packet:Frame;
       var request:OpenRequest;
       var tokenb:ByteArray = null;
       var tokeno:uint = 0;
@@ -230,7 +230,7 @@ package hydna.net {
       // Ref count
       _socket.allocChannel();
 
-      packet = new Packet(ch, Packet.OPEN, mode, tokenb, tokeno, tokenl);
+      packet = new Frame(ch, Frame.OPEN, mode, tokenb, tokeno, tokenl);
 
       request = new OpenRequest(this, ch, packet);
 
@@ -258,7 +258,7 @@ package hydna.net {
                               , offset:uint=0
                               , length:uint=0
                               , priority:uint=1) : void {
-      var packet:Packet;
+      var packet:Frame;
 
       if (connected == false || _socket == null) {
         throw new IOError("Channel is not connected.");
@@ -272,7 +272,7 @@ package hydna.net {
         throw new RangeError("Priority must be between 1 - 5");
       }
 
-      packet = new Packet( _ch, Packet.DATA, priority
+      packet = new Frame( _ch, Frame.DATA, priority
                          , data, offset, length);
 
       _socket.writeBytes(packet);
@@ -316,7 +316,7 @@ package hydna.net {
     public function emit( data:ByteArray
                         , offset:uint=0
                         , length:uint=0) : void {
-      var packet:Packet;
+      var packet:Frame;
 
       if (connected == false || _socket == null) {
         throw new IOError("Channel is not connected.");
@@ -326,7 +326,7 @@ package hydna.net {
         throw new Error("You do not have permission to send signals");
       }
 
-      packet = new Packet( _ch, Packet.SIGNAL, Packet.SIG_EMIT
+      packet = new Frame( _ch, Frame.SIGNAL, Frame.SIG_EMIT
                          , data, offset, length);
 
       _socket.writeBytes(packet);
@@ -351,7 +351,7 @@ package hydna.net {
      *  @param message An optional message to send with the close signal.
      */
     public function close(message:String=null) : void {
-      var packet:Packet;
+      var packet:Frame;
       var payload:ByteArray;
 
       if (_socket == null || _closing) {
@@ -377,7 +377,7 @@ package hydna.net {
         return;
       }
 
-      packet = new Packet(_ch, Packet.SIGNAL, Packet.SIG_END, payload);
+      packet = new Frame(_ch, Frame.SIGNAL, Frame.SIG_END, payload);
 
       if (_openRequest != null) {
         // Open request is not responded to yet. Wait to send ENDSIG until
@@ -401,7 +401,7 @@ package hydna.net {
     // Internal callback for open success
     internal function openSuccess(respch:uint) : void {
       var origch:uint = _ch;
-      var packet:Packet;
+      var packet:Frame;
 
       _openRequest = null;
       _ch = respch;

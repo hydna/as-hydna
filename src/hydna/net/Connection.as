@@ -44,7 +44,7 @@ package hydna.net {
   import flash.utils.Dictionary;
 
   import hydna.net.OpenRequest;
-  import hydna.net.Packet;
+  import hydna.net.Frame;
   import hydna.net.Channel;
   import hydna.net.ChannelDataEvent;
   import hydna.net.ChannelErrorEvent;
@@ -304,7 +304,7 @@ package hydna.net {
 
       readBytes(_receiveBuffer, _receiveBuffer.length, bytesAvailable);
 
-      while (_receiveBuffer.bytesAvailable >= Packet.HEADER_SIZE) {
+      while (_receiveBuffer.bytesAvailable >= Frame.HEADER_SIZE) {
         size = _receiveBuffer.readUnsignedShort();
 
         if (_receiveBuffer.bytesAvailable < (size - 2)) {
@@ -317,23 +317,23 @@ package hydna.net {
         op = _receiveBuffer.readUnsignedByte();
         flag = (op & 0xf);
 
-        if (size - Packet.HEADER_SIZE) {
+        if (size - Frame.HEADER_SIZE) {
           payload = new ByteArray();
-          _receiveBuffer.readBytes(payload, 0, size - Packet.HEADER_SIZE);
+          _receiveBuffer.readBytes(payload, 0, size - Frame.HEADER_SIZE);
         }
 
         switch ((op >> 4)) {
 
-          case Packet.OPEN:
-            processOpenPacket(ch, flag, payload);
+          case Frame.OPEN:
+            processOpenFrame(ch, flag, payload);
             break;
 
-          case Packet.DATA:
-            processDataPacket(ch, flag, payload);
+          case Frame.DATA:
+            processDataFrame(ch, flag, payload);
             break;
 
-          case Packet.SIGNAL:
-            processSignalPacket(ch, flag, payload);
+          case Frame.SIGNAL:
+            processSignalFrame(ch, flag, payload);
             break;
         }
       }
@@ -344,7 +344,7 @@ package hydna.net {
     }
 
     // process an open packet
-    private function processOpenPacket( ch:uint
+    private function processOpenFrame( ch:uint
                                       , flag:Number
                                       , payload:ByteArray) : void {
       var request:OpenRequest;
@@ -364,12 +364,12 @@ package hydna.net {
 
       switch (flag) {
 
-        case Packet.OPEN_SUCCESS:
+        case Frame.OPEN_SUCCESS:
           _openChannels[ch] = stream;
           stream.openSuccess(request.ch);
           break;
 
-        case Packet.OPEN_REDIRECT:
+        case Frame.OPEN_REDIRECT:
 
           if (payload == null || payload.length < 4) {
             destroy(new ChannelErrorEvent("Expected redirect channel from server"));
@@ -387,14 +387,14 @@ package hydna.net {
           stream.openSuccess(redirectch);
           break;
 
-        case Packet.OPEN_FAIL_NA:
-        case Packet.OPEN_FAIL_MODE:
-        case Packet.OPEN_FAIL_PROTOCOL:
-        case Packet.OPEN_FAIL_HOST:
-        case Packet.OPEN_FAIL_AUTH:
-        case Packet.OPEN_FAIL_SERVICE_NA:
-        case Packet.OPEN_FAIL_SERVICE_ERR:
-        case Packet.OPEN_FAIL_OTHER:
+        case Frame.OPEN_FAIL_NA:
+        case Frame.OPEN_FAIL_MODE:
+        case Frame.OPEN_FAIL_PROTOCOL:
+        case Frame.OPEN_FAIL_HOST:
+        case Frame.OPEN_FAIL_AUTH:
+        case Frame.OPEN_FAIL_SERVICE_NA:
+        case Frame.OPEN_FAIL_SERVICE_ERR:
+        case Frame.OPEN_FAIL_OTHER:
           event = ChannelErrorEvent.fromOpenError(flag, payload);
           stream.destroy(event);
           break;
@@ -408,7 +408,7 @@ package hydna.net {
 
         // Destroy all pending request IF response wasn't a
         // redirected stream.
-        if (flag == Packet.OPEN_REDIRECT && redirectch == ch) {
+        if (flag == Frame.OPEN_REDIRECT && redirectch == ch) {
           delete _pendingOpenRequests[ch];
 
           event = new ChannelErrorEvent("Channel already open");
@@ -442,12 +442,12 @@ package hydna.net {
     }
 
     // process a data packet
-    private function processDataPacket( ch:uint
+    private function processDataFrame( ch:uint
                                       , flag:Number
                                       , payload:ByteArray) : void {
       var stream:Channel;
       var event:Event;
-      var packet:Packet;
+      var packet:Frame;
 
       if (payload == null || payload.length == 0) {
         destroy(new ChannelErrorEvent("Zero data packet sent received"));
@@ -464,7 +464,7 @@ package hydna.net {
         stream = Channel(_openChannels[ch]);
 
         if (stream == null) {
-          destroy(new ChannelErrorEvent("Packet sent to unknown stream"));
+          destroy(new ChannelErrorEvent("Frame sent to unknown stream"));
           return;
         }
 
@@ -475,16 +475,16 @@ package hydna.net {
     }
 
     // process a signal packet
-    private function processSignalPacket( ch:uint
+    private function processSignalFrame( ch:uint
                                         , flag:Number
                                         , payload:ByteArray) : void {
       var event:Event = null;
       var stream:Channel;
-      var packet:Packet;
+      var packet:Frame;
 
       switch (flag) {
 
-        case Packet.SIG_EMIT:
+        case Frame.SIG_EMIT:
 
           if (ch == BROADCAST_ADDR) {
             for (var key:String in _openChannels) {
@@ -498,7 +498,7 @@ package hydna.net {
             stream = Channel(_openChannels[ch]);
 
             if (stream == null) {
-              destroy(new ChannelErrorEvent("Packet sent to unknown stream"));
+              destroy(new ChannelErrorEvent("Frame sent to unknown stream"));
               return;
             }
 
@@ -506,16 +506,16 @@ package hydna.net {
           }
           break;
 
-        case Packet.SIG_END:
+        case Frame.SIG_END:
 
           event = new ChannelCloseEvent(payload);
 
-        case Packet.SIG_ERR_PROTOCOL:
-        case Packet.SIG_ERR_OPERATION:
-        case Packet.SIG_ERR_LIMIT:
-        case Packet.SIG_ERR_SERVER:
-        case Packet.SIG_ERR_VIOLATION:
-        case Packet.SIG_ERR_OTHER:
+        case Frame.SIG_ERR_PROTOCOL:
+        case Frame.SIG_ERR_OPERATION:
+        case Frame.SIG_ERR_LIMIT:
+        case Frame.SIG_ERR_SERVER:
+        case Frame.SIG_ERR_VIOLATION:
+        case Frame.SIG_ERR_OTHER:
 
           if (event == null) {
             event = ChannelErrorEvent.fromSigError(flag, payload);
@@ -535,7 +535,7 @@ package hydna.net {
               // We havent closed our stream yet. We therefor need to send
               // and an ENDSIG in response to this packet.
 
-              packet = new Packet(ch, Packet.SIGNAL, Packet.SIG_END, payload);
+              packet = new Frame(ch, Frame.SIGNAL, Frame.SIG_END, payload);
 
               try {
                 this.writeBytes(packet);

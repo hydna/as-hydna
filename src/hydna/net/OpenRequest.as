@@ -36,7 +36,7 @@ package hydna.net {
 
   import flash.utils.ByteArray;
 
-  import hydna.net.Packet;
+  import hydna.net.Frame;
   import hydna.net.Channel;
 
   // Internal class to handle open requests.
@@ -44,12 +44,12 @@ package hydna.net {
 
     internal var _stream:Channel;
     internal var _ch:uint;
-    internal var _packet:Packet;
+    internal var _packet:Frame;
     internal var _sent:Boolean;
 
     public function OpenRequest( stream:Channel
                                , ch:uint
-                               , packet:Packet) {
+                               , packet:Frame) {
       _stream = stream;
       _ch = ch;
       _packet = packet;
@@ -63,7 +63,7 @@ package hydna.net {
       return _ch;
     }
 
-    public function get packet() : Packet {
+    public function get packet() : Frame {
       return _packet;
     }
 
