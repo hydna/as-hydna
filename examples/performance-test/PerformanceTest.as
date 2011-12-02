@@ -52,8 +52,8 @@ package {
    *
    */
   public class PerformanceTest extends Sprite {
-
-    public static const ADDRESS:String = "localhost:7010/5";
+    // Replace ADDRESS with your own domain
+    public static const ADDRESS:String = "public.hydna.net";
 
     public static const MESSAGE_COUNT:Number = 10000;
     public static const MESSAGE:String = "This is a performance test!";

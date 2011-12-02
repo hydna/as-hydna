@@ -54,8 +54,8 @@ package {
    *
    */
   public class HelloWorld extends Sprite {
-
-    public static const ADDRESS:String = "abc@localhost:7010/x00112233";
+    // Replace ADDRESS with your own domain
+    public static const ADDRESS:String = "public.hydna.net";
 
     public function HelloWorld() {
       var channel:Channel;
