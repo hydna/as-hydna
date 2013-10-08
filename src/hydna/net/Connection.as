@@ -56,7 +56,6 @@ package hydna.net {
   // Internal wrapper around flash.net.Socket
   internal class Connection extends Socket {
 
-    private static const MAX_REDIRECT_ATTEMPTS:Number = 5;
     private static const DEFAULT_PORT:Number = 80;
 
     private static const BROADCAST_ALL:Number = 0;
@@ -68,8 +67,6 @@ package hydna.net {
     private static const CUSTOM_ERR_CODE:Number = 0xf;
 
     private static var availableSockets:Dictionary;
-
-    public static var followRedirects:Boolean = true;
 
     private var _attempt:Number;
     private var _handshakeBuffer:String;
@@ -182,8 +179,7 @@ package hydna.net {
       packet[1] = "Connection: Upgrade";
       packet[2] = "Upgrade: winksock/1";
       packet[3] = "Host: " + _urlobj.host;
-      packet[4] = "X-Accept-Redirects: " + (followRedirects ? "yes" : "no");
-      packet[5] = "\r\n";
+      packet[4] = "\r\n";
 
       this.writeMultiByte(packet.join("\r\n"), "us-ascii");
 
@@ -265,39 +261,6 @@ package hydna.net {
             destroy(ChannelErrorEvent.fromError(error));
           }
 
-          return;
-
-        case 300:
-        case 301:
-        case 302:
-        case 303:
-        case 304:
-
-          if (followRedirects == false) {
-            destroy(new ChannelErrorEvent("Bad handshake (" +
-                                          "HTTP-redirection is disabled" +
-                                          ")"));
-            return;
-          }
-
-          if (_attempt > MAX_REDIRECT_ATTEMPTS) {
-            destroy(new ChannelErrorEvent("Bad handshake (" +
-                                          "Too many redirect attempts" +
-                                          ")"));
-            return;
-          }
-
-          for (var i:Number = 1; i < head.length; i++) {
-            m = /(\.):\s+(|.)/.exec(head[i]);
-            if (m && m[1].toLowerCase() == "host") {
-              handshake(URLParser.parse(m[2]));
-              return;
-            }
-          }
-
-          destroy(new ChannelErrorEvent("Bad handshake (" +
-                                        "Expected 'host' in redirect" +
-                                        ")"));
           return;
 
         default:

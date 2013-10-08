@@ -54,25 +54,6 @@ package hydna.net {
 
     public static var PAYLOAD_MAX_SIZE:Number = Frame.PAYLOAD_MAX_SIZE;
 
-    /**
-     *  Indicates if HTTP-redirects should be
-     *  followed or not.
-     *
-     */
-    public function get followRedirects() : Boolean {
-      return Connection.followRedirects;
-    }
-
-
-    /**
-     *  @Returns {Boolean} true if HTTP-redirects should be
-     *  followed, else false.
-     */
-    public function set followRedirects(value:Boolean) : void {
-      Connection.followRedirects = value;
-    }
-
-
     private var _id:uint = 0;
     private var _url:String = null;
     private var _token:String = null;
