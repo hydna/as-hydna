@@ -459,34 +459,6 @@ package hydna.net {
           channel.openSuccess(request.id, message);
           break;
 
-        case Frame.OPEN_REDIRECT:
-
-          if (payload == null || payload.length < 4) {
-            destroy(new ChannelErrorEvent("Expected redirect channel from server"));
-            return;
-          }
-
-          redirectid = payload.readUnsignedInt();
-
-          if (payload.length > 4) {
-            try {
-              message = payload.readUTFBytes(payload.length - 4);
-            } catch (err:EOFError) {
-              destroy(ChannelErrorEvent.fromError(err));
-              return;
-            }
-          }
-
-          if (_openChannels[redirectid]) {
-            destroy(new ChannelErrorEvent("Server redirected to open channel"));
-            return;
-          }
-
-          _openChannels[redirectid] = channel;
-
-          channel.openSuccess(redirectid, message);
-          break;
-
         default:
 
           if (payload && payload.length) {
