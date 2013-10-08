@@ -254,7 +254,7 @@ package hydna.net {
     public function writeBytes(data:ByteArray,
                                offset:uint=0,
                                length:uint=0,
-                               priority:uint=1) : void {
+                               priority:uint=0) : void {
       var frame:Frame;
 
       if (connected == false || _connection == null) {
@@ -265,8 +265,8 @@ package hydna.net {
         throw new Error("Channel is not writable");
       }
 
-      if (priority < 1 || priority > 5) {
-        throw new RangeError("Priority must be between 1 - 5");
+      if (priority < 0 || priority > 7) {
+        throw new RangeError("Priority must be between 0 - 7");
       }
 
       frame = new Frame(_id, Frame.DATA, priority, data, offset, length);
