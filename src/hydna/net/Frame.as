@@ -42,6 +42,7 @@ package hydna.net {
     internal static const HEADER_SIZE:Number = 0x07;
 
     // Opcodes
+    internal static const KEEPALIVE:Number = 0x00;
     internal static const OPEN:Number = 0x01;
     internal static const DATA:Number = 0x02;
     internal static const SIGNAL:Number = 0x03;

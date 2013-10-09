@@ -395,6 +395,9 @@ package hydna.net {
 
         switch (op) {
 
+          case Frame.KEEPALIVE:
+            break;
+
           case Frame.OPEN:
             processOpenFrame(id, flag, payload);
             break;
