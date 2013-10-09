@@ -85,9 +85,11 @@ package hydna.net {
     private var _channelRefCount:Number = 0;
     private var _requestRefCount:Number = 0;
 
+
     {
       availableSockets = new Dictionary();
     }
+
 
     // Return an available connection or create a new one.
     internal static function getConnection(url:String) : Connection {
@@ -111,6 +113,7 @@ package hydna.net {
 
       return connection;
     }
+
 
     /**
      *  Initializes a new Channel instance
@@ -260,11 +263,13 @@ package hydna.net {
       }
     }
 
+
     // Internal method to keep track of no of channels that is associated
     // with this connection instance.
     internal function allocChannel() : void {
       _channelRefCount++;
     }
+
 
     // Decrease the reference count
     internal function deallocChannel(id:uint=0) : void {
@@ -278,10 +283,12 @@ package hydna.net {
       }
     }
 
+
     internal function allocOpenRequest(request:OpenRequest) : void {
       _requestRefCount++;
       _pendingOpenRequests[request.id] = request;
     }
+
 
     internal function deallocOpenRequest(request:OpenRequest) {
       delete _pendingOpenRequests[request.id];
@@ -290,6 +297,7 @@ package hydna.net {
         destroy();
       }
     }
+
 
     internal function flushPendingOpenRequests(specificRequest:OpenRequest=null) {
       var request:OpenRequest;
@@ -462,6 +470,7 @@ package hydna.net {
       deallocOpenRequest(request);
     }
 
+
     // process a data packet
     private function processDataFrame(id:uint,
                                       flag:Number,
@@ -493,6 +502,7 @@ package hydna.net {
         channel.dispatchEvent(event);
       }
     }
+
 
     // process a signal packet
     private function processSignalFrame(id:uint,
