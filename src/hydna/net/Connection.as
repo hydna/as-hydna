@@ -583,19 +583,23 @@ package hydna.net {
 
     }
 
+
     private function securityErrorHandler(event:SecurityErrorEvent) : void {
       destroy(new ChannelErrorEvent("Security error"));
     }
+
 
     // Handles connection errors
     private function errorHandler(event:IOErrorEvent) : void {
       destroy(ChannelErrorEvent.fromEvent(event));
     }
 
+
     // Handles connection close
     private function closeHandler(event:Event) : void {
       destroy(new ChannelErrorEvent("Disconnected from server"));
     }
+
 
     private function getOpenRequestById (id:uint) {
       return OpenRequest(_pendingOpenRequests[id]);
