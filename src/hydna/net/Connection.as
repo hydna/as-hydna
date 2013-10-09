@@ -83,6 +83,7 @@ package hydna.net {
     private var _openChannels:Dictionary;
 
     private var _channelRefCount:Number = 0;
+    private var _requestRefCount:Number = 0;
 
     {
       availableSockets = new Dictionary();
@@ -265,11 +266,6 @@ package hydna.net {
       _channelRefCount++;
     }
 
-    internal function allocOpenRequest(request:OpenRequest) : void {
-      _pendingOpenRequests[request.id] = request;
-    }
-
-
     // Decrease the reference count
     internal function deallocChannel(id:uint=0) : void {
 
@@ -277,7 +273,20 @@ package hydna.net {
         delete _openChannels[id];
       }
 
-      if (--_channelRefCount == 0) {
+      if (--_channelRefCount == 0 && _requestRefCount == 0) {
+        destroy();
+      }
+    }
+
+    internal function allocOpenRequest(request:OpenRequest) : void {
+      _requestRefCount++;
+      _pendingOpenRequests[request.id] = request;
+    }
+
+    internal function deallocOpenRequest(request:OpenRequest) {
+      delete _pendingOpenRequests[request.id];
+
+      if (--_requestRefCount == 0 && _channelRefCount == 0) {
         destroy();
       }
     }
@@ -318,7 +327,8 @@ package hydna.net {
       } else if ((currentRequest = OpenRequest(_pendingOpenRequests[id]))) {
         return currentRequest.channel.setPendingOpenRequest(request);
       } else {
-        _pendingOpenRequests[id] = request;
+
+        allocOpenRequest(request);
 
         if (_handshaked) {
           flushPendingOpenRequests(request);
@@ -338,7 +348,7 @@ package hydna.net {
         return false;
       }
 
-      freeOpenRequestById(id);
+      deallocOpenRequest(request);
 
       return true;
     }
@@ -413,8 +423,6 @@ package hydna.net {
 
       channel = request.channel;
 
-      freeOpenRequestById(id);
-
       switch (flag) {
 
         case Frame.OPEN_SUCCESS:
@@ -431,6 +439,7 @@ package hydna.net {
           _openChannels[id] = channel;
 
           channel.openSuccess(request.id, message);
+
           break;
 
         default:
@@ -446,9 +455,11 @@ package hydna.net {
 
           event = new ChannelErrorEvent(message || "Denied to open channel");
           channel.destroy(event);
+
           return;
       }
 
+      deallocOpenRequest(request);
     }
 
     // process a data packet
@@ -580,9 +591,6 @@ package hydna.net {
       return OpenRequest(_pendingOpenRequests[id]);
     }
 
-    private function freeOpenRequestById (id:uint) {
-      delete _pendingOpenRequests[id];
-    }
 
     // Finalize the Socket
     private function destroy(errorEvent:Event=null) : void {

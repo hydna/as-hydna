@@ -452,12 +452,13 @@ package hydna.net {
       _pendingOpenRequest = null;
 
       if (_connection) {
-        _connection.deallocChannel(connected ? id : 0);
 
         if (request) {
           _connection.allocOpenRequest(request);
           _connection.flushPendingOpenRequest(request);
         }
+
+        _connection.deallocChannel(connected ? id : 0);
 
         _connection = null;
       } else {
