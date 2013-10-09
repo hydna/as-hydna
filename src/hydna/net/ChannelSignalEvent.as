@@ -41,16 +41,29 @@ package hydna.net {
 
     public static const SIGNAL:String = "signal";
 
+    private var _data:ByteArray;
     private var _message:String;
 
-    public function ChannelSignalEvent(message:String) {
+
+    public function ChannelSignalEvent(data:ByteArray, message:String=null) {
       super(SIGNAL, false, false);
 
+      _data = data;
       _message = message;
     }
 
+
     /**
-     *  Returns the message associated with this ChannelSignalEvent instance.
+     *  Returns the data associated with this ChannelSignalEvent instance.
+     */
+    public function get data() : ByteArray {
+      return _data;
+    }
+
+
+    /**
+     *  Returns the message associated with this ChannelSignalEvent
+     *  instance. The property is null if message was of type binary.
      */
     public function get message() : String {
       return _message;

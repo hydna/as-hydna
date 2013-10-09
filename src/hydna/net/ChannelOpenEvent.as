@@ -41,15 +41,29 @@ package hydna.net {
 
     public static const OPEN:String = "open";
 
+    private var _data:ByteArray = null;
     private var _message:String = null;
 
-    public function ChannelOpenEvent(message:String) {
+
+    public function ChannelOpenEvent(data:ByteArray, message:String=null) {
       super(OPEN, false, false);
+
+      _data = data;
       _message = message;
     }
 
+
     /**
-     *  Returns the message associated with this ChannelOpenEvent instance.
+     *  Returns the data associated with this ChannelOpenEvent instance.
+     */
+    public function get data() : ByteArray {
+      return _data;
+    }
+
+
+    /**
+     *  Returns the message associated with this ChannelOpenEvent
+     *  instance. The property is null if message was of type binary.
      */
     public function get message() : String {
       return _message;

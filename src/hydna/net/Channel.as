@@ -228,7 +228,7 @@ package hydna.net {
       // Ref count
       _connection.allocChannel();
 
-      frame = new Frame(id, Frame.OPEN, mode, token);
+      frame = new Frame(id, Frame.PAYLOAD_UTF, Frame.OPEN, mode, token);
 
       request = new OpenRequest(this, id, frame);
 
@@ -238,6 +238,33 @@ package hydna.net {
 
       _openRequest = request;
     }
+
+
+    public function isClosing() : Boolean {
+      return _closing;
+    }
+
+
+    /**
+     *  Writes a UTF-8 string to the channel. Similar to the writeUTF()
+     *  method, but writeUTFBytes() does not prefix the string with a 16-bit
+     *  length word.
+     *
+     *  @param data The string to write to the channel.
+     */
+    public function write(data:String, priority:uint=0) : void {
+      var buffer:ByteArray;
+
+      if (data == null || data.length == 0) {
+        throw new Error('Expected data as String');
+      }
+
+      buffer = new ByteArray();
+      buffer.writeUTFBytes(data);
+
+      _write(Frame.PAYLOAD_UTF, priority, buffer);
+    }
+
 
     /**
      *  Writes a sequence of bytes from the specified byte array. The write
@@ -258,49 +285,13 @@ package hydna.net {
                                priority:uint=0) : void {
       var frame:Frame;
 
-      if (connected == false || _connection == null) {
-        throw new IOError("Channel is not connected.");
+      if (data == null || data.length == 0) {
+        throw new Error('Expected data as non-empty ByteArray');
       }
 
-      if (!_writable) {
-        throw new Error("Channel is not writable");
-      }
-
-      if (priority < 0 || priority > 7) {
-        throw new RangeError("Priority must be between 0 - 7");
-      }
-
-      frame = new Frame(_id, Frame.DATA, priority, data, offset, length);
-
-      _connection.writeBytes(frame);
-      _connection.flush();
+      _write(Frame.PAYLOAD_BIN, priority, data, offset, length);
     }
 
-    /**
-     *  Writes the following data to the connection: a 16-bit unsigned integer,
-     *  which indicates the length of the specified UTF-8 string in bytes,
-     *  followed by the string itself.
-     *
-     *  @param {String} value The string to write to the channel.
-     */
-    public function writeUTF(value:String) : void {
-      var data:ByteArray = new ByteArray();
-      data.writeUTF(value);
-      writeBytes(data);
-    }
-
-    /**
-     *  Writes a UTF-8 string to the channel. Similar to the writeUTF()
-     *  method, but writeUTFBytes() does not prefix the string with a 16-bit
-     *  length word.
-     *
-     *  @param value The string to write to the channel.
-     */
-    public function writeUTFBytes(value:String) : void {
-      var data:ByteArray = new ByteArray();
-      data.writeUTFBytes(value);
-      writeBytes(data);
-    }
 
     /**
      *  Emit's a signal to the channel.
@@ -310,27 +301,37 @@ package hydna.net {
      *
      *  @param value The string to write to the channel.
      */
-    public function emit(message:String=null) : void {
-      var frame:Frame;
-      var data:ByteArray;
+    public function emit(data:String) : void {
+      var buffer:ByteArray;
 
-      if (connected == false || _connection == null) {
-        throw new IOError("Channel is not connected.");
+      if (data == null || data.length == 0) {
+        throw new Error('Expected data as String');
       }
 
-      if (!_emitable) {
-        throw new Error("You do not have permission to send signals");
+      buffer = new ByteArray();
+      buffer.writeUTFBytes(data);
+
+      _emit(Frame.PAYLOAD_UTF, buffer);
+    }
+
+
+    /**
+     *  Emit's a signal to the channel.
+     *
+     *  <p>Note: Channel must be opened with the mode EMIT in order to use
+     *     the emit method.</p>
+     *
+     *  @param data The string to write to the channel.
+     */
+    public function emitBytes(data:ByteArray,
+                              offset:uint=0,
+                              length:uint=0) : void {
+
+      if (data == null || data.length == 0) {
+        throw new Error('Expected data as String');
       }
 
-      if (message !== null) {
-        data = new ByteArray();
-        data.writeUTFBytes(message);
-      }
-
-      frame = new Frame(_id, Frame.SIGNAL, Frame.SIG_EMIT, data);
-
-      _connection.writeBytes(frame);
-      _connection.flush();
+      _emit(Frame.PAYLOAD_BIN, data, offset, length);
     }
 
 
@@ -340,55 +341,34 @@ package hydna.net {
      *  @param message An optional message to send with the close signal.
      */
     public function close(message:String=null) : void {
-      var frame:Frame;
       var data:ByteArray;
-
-      if (_connection == null || _closing) {
-        return;
-      }
-
-      _closing = true;
-      _readable = false;
-      _writable = false;
-      _emitable = false;
 
       if (message != null) {
         data = new ByteArray();
         data.writeUTFBytes(message);
       }
 
-      if (_openRequest != null && _connection.cancelOpen(_openRequest)) {
-        // Open request hasn't been posted yet, which means that it's
-        // safe to destroy channel immediately.
-
-        _openRequest = null;
-        destroy();
-        return;
-      }
-
-      frame = new Frame(_id, Frame.SIGNAL, Frame.SIG_END, data);
-
-      if (_openRequest != null) {
-        // Open request is not responded to yet. Wait to send ENDSIG until
-        // we get an OPENRESP.
-
-        _pendingClose = frame;
-      } else {
-        try {
-          _connection.writeBytes(frame);
-          _connection.flush();
-        } catch (error:IOError) {
-          destroy(ChannelErrorEvent.fromError(error));
-        }
-      }
+      _close(Frame.PAYLOAD_UTF, data);
     }
 
-    internal function isClosing() : Boolean {
-      return _closing;
+
+    /**
+     *  Closes the Channel instance.
+     *
+     *  @param message An optional message to send with the close signal.
+     */
+    public function closeBytes(data:ByteArray,
+                               offset:uint=0,
+                               length:uint=0) : void {
+      _close(Frame.PAYLOAD_BIN, data, offset, length);
     }
+
+
 
     // Internal callback for open success
-    internal function openSuccess(id:uint, message:String=null) : void {
+    internal function openSuccess(id:uint,
+                                  data:ByteArray,
+                                  message:String=null) : void {
       var frame:Frame;
 
       _openRequest = null;
@@ -404,19 +384,13 @@ package hydna.net {
         // frame before sending to server.
         frame.id = id;
 
-        try {
-          _connection.writeBytes(frame);
-          _connection.flush();
-        } catch (error:IOError) {
-          // Something wen't terrible wrong. Queue frame and wait
-          // for a reconnect.
+        flushFrame(frame);
 
-          destroy(ChannelErrorEvent.fromError(error));
-        }
       } else {
-        dispatchEvent(new ChannelOpenEvent(message));
+        dispatchEvent(new ChannelOpenEvent(data, message));
       }
     }
+
 
     internal function setPendingOpenRequest(request:OpenRequest) : void {
       
@@ -433,6 +407,7 @@ package hydna.net {
 
       return true;
     }
+
 
     // Internally destroy connection.
     internal function destroy(event:Event=null) : void {
@@ -471,6 +446,111 @@ package hydna.net {
       if (event != null) {
         dispatchEvent(event);
       }
+    }
+
+
+    private function _write(ctype:uint,
+                            priority:uint,
+                            data:ByteArray,
+                            offset:uint=0,
+                            length=uint=0) {
+      var frame:Frame;
+
+      if (connected == false || _connection == null) {
+        throw new IOError("Channel is not connected.");
+      }
+
+      if (!_writable) {
+        throw new Error("Channel is not writable");
+      }
+
+      if (priority < 0 || priority > 7) {
+        throw new RangeError("Priority must be between 0 - 7");
+      }
+
+      frame = new Frame(_id, ctype, Frame.DATA, priority, data, offset, length);
+      flushFrame(frame);
+    }
+
+
+    private function _emit(ctype:uint,
+                           data:ByteArray,
+                           offset:uint=0,
+                           length=uint=0) {
+      var frame:Frame;
+
+      if (connected == false || _connection == null) {
+        throw new IOError("Channel is not connected.");
+      }
+
+      if (!_emitable) {
+        throw new Error("You do not have permission to send signals");
+      }
+
+      frame = new Frame(_id,
+                        ctype,
+                        Frame.SIGNAL,
+                        Frame.SIG_EMIT,
+                        data,
+                        offset,
+                        length);
+
+      flushFrame(frame);
+    }
+
+
+    private function _close(ctype:uint
+                            data:ByteArray,
+                            offset:uint=0,
+                            length:uint=0) {
+      var frame:Frame;
+
+      if (_connection == null || _closing) {
+        return;
+      }
+
+      _closing = true;
+      _readable = false;
+      _writable = false;
+      _emitable = false;
+
+      if (_openRequest != null && _connection.cancelOpen(_openRequest)) {
+        // Open request hasn't been posted yet, which means that it's
+        // safe to destroy channel immediately.
+
+        _openRequest = null;
+        destroy();
+        return;
+      }
+
+      frame = new Frame(_id,
+                        ctype,
+                        Frame.SIGNAL,
+                        Frame.SIG_END,
+                        data,
+                        offset,
+                        length);
+
+      if (_openRequest != null) {
+        // Open request is not responded to yet. Wait to send ENDSIG until
+        // we get an OPENRESP.
+
+        _pendingClose = frame;
+      } else {
+        flushFrame(frame);
+      }
+    }
+
+
+    private function flushFrame(frame:Frame) {
+      try {
+        _connection.writeBytes(frame);
+        _connection.flush();
+      } catch (error:IOError) {
+        // Something wen't terrible wrong. Queue frame and wait
+        // for a reconnect.
+        destroy(ChannelErrorEvent.fromError(error));
+      } 
     }
 
   }

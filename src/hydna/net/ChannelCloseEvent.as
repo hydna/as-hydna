@@ -41,15 +41,29 @@ package hydna.net {
 
     public static const CLOSE:String = "close";
 
-    private var _message:String = null;
+    private var _data:ByteArray;
+    private var _message:String;
 
-    public function ChannelCloseEvent(message:String) {
+
+    public function ChannelCloseEvent(data:ByteArray, message:String=null) {
       super(CLOSE, false, false);
+
+      _data = data;
       _message = message;
     }
 
+
     /**
-     *  Returns the message associated with this ChannelCloseEvent instance.
+     *  Returns the data associated with this ChannelCloseEvent instance.
+     */
+    public function get data() : ByteArray {
+      return _data;
+    }
+
+
+    /**
+     *  Returns the message associated with this ChannelCloseEvent
+     *  instance. The property is null if message was of type binary.
      */
     public function get message() : String {
       return _message;

@@ -42,13 +42,25 @@ package hydna.net {
     public static const DATA:String = "data";
 
     private var _data:ByteArray;
+    private var _message:String;
     private var _priority:Number
 
-    public function ChannelDataEvent(priority:Number, data:ByteArray) {
+
+    public function ChannelDataEvent(priority:Number,
+                                     data:ByteArray,
+                                     message:String=null) {
       super(DATA, false, false);
-      _data = data;
+
       _priority = priority;
+      _data = data;
+      _message = message;
     }
+
+
+    public function get priority() : Number {
+      return _priority;
+    }
+
 
     /**
      *  Returns the data associated with this ChannelDataEvent instance.
@@ -57,8 +69,13 @@ package hydna.net {
       return _data;
     }
 
-    public function get priority() : Number {
-      return _priority;
+
+    /**
+     *  Returns the message associated with this ChannelCloseEvent
+     *  instance. The property is null if message was of type binary.
+     */
+    public function get message() : String {
+      return _message;
     }
 
   }

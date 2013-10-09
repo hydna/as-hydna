@@ -50,14 +50,28 @@ package hydna.net {
     // Open Flags
     internal static const OPEN_SUCCESS:Number = 0x0;
 
+    // Content types
+    internal static const PAYLOAD_UTF:Number = 0x0;
+    internal static const PAYLOAD_BIN:Number = 0x1;
+
     // Signal Flags
     internal static const SIG_EMIT:Number = 0x0;
     internal static const SIG_END:Number = 0x1;
 
-    // Upper payload limit (10kb)
+    // Upper payload limit
     internal static const PAYLOAD_MAX_SIZE:Number = 0xFFFFFF - HEADER_SIZE;
 
+    internal static const FLAG_BITMASK:Number = 0x7;
+
+    internal static const OP_BITPOS:Number = 3;
+    internal static const OP_BITMASK:Number = (0x7 << OP_BITPOS);
+
+    internal static const CTYPE_BITPOS:Number = 6;
+    internal static const CTYPE_BITMASK:Number = (0x1 << CTYPE_BITPOS);
+
+
     public function Frame(id:uint,
+                          ctype:uint,
                           op:uint,
                           flag:uint=0,
                           payload:ByteArray=null,
@@ -89,7 +103,8 @@ package hydna.net {
 
       writeShort(fixedLength + HEADER_SIZE);
       writeUnsignedInt(id);
-      writeByte(op << 3 | flag);
+      writeByte((ctype << CTYPE_BITPOS) | (op << OP_BITPOS) | flag);
+
       if (payload != null) {
         writeBytes(payload, fixedOffset, fixedLength);
       }
