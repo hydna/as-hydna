@@ -387,12 +387,11 @@ package hydna.net {
     }
 
     // Internal callback for open success
-    internal function openSuccess(respid:uint, message:String=null) : void {
-      var origid:uint = _id;
+    internal function openSuccess(id:uint, message:String=null) : void {
       var frame:Frame;
 
       _openRequest = null;
-      _id = respid;
+      _id = id;
       _connected = true;
 
       if (_pendingClose) {
@@ -400,12 +399,9 @@ package hydna.net {
         frame = _pendingClose;
         _pendingClose = null;
 
-        if (origid != respid) {
-          // channel is changed. We need to change the channel of the
-          // frame before sending to server.
-
-          frame.id = respid;
-        }
+        // channel is changed. We need to set the channel of the
+        // frame before sending to server.
+        frame.id = id;
 
         try {
           _connection.writeBytes(frame);
