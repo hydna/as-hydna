@@ -48,7 +48,6 @@ package hydna.net {
 
     // Open Flags
     internal static const OPEN_SUCCESS:Number = 0x0;
-    internal static const OPEN_REDIRECT:Number = 0x1;
 
     // Signal Flags
     internal static const SIG_EMIT:Number = 0x0;

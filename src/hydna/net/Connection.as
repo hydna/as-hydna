@@ -81,7 +81,6 @@ package hydna.net {
 
     private var _pendingOpenRequests:Dictionary;
     private var _openChannels:Dictionary;
-    private var _openWaitQueue:Dictionary;
 
     private var _channelRefCount:Number = 0;
 
@@ -124,7 +123,6 @@ package hydna.net {
 
       _pendingOpenRequests = new Dictionary();
       _openChannels = new Dictionary();
-      _openWaitQueue = new Dictionary();
 
       addEventListener(Event.CLOSE, closeHandler);
       addEventListener(IOErrorEvent.IO_ERROR, errorHandler);
@@ -249,17 +247,7 @@ package hydna.net {
           _receiveBuffer = new ByteArray();
           this.addEventListener(ProgressEvent.SOCKET_DATA, receiveHandler);
 
-          for (var key:Object in _pendingOpenRequests) {
-            request = OpenRequest(_pendingOpenRequests[key]);
-            writeBytes(request.frame);
-            request.sent = true;
-          }
-
-          try {
-            flush();
-          } catch (error:Error) {
-            destroy(ChannelErrorEvent.fromError(error));
-          }
+          flushPendingOpenRequests();
 
           return;
 
@@ -277,6 +265,10 @@ package hydna.net {
       _channelRefCount++;
     }
 
+    internal function allocOpenRequest(request:OpenRequest) : void {
+      _pendingOpenRequests[request.id] = request;
+    }
+
 
     // Decrease the reference count
     internal function deallocChannel(id:uint=0) : void {
@@ -290,39 +282,46 @@ package hydna.net {
       }
     }
 
+    internal function flushPendingOpenRequests(specificRequest:OpenRequest=null) {
+      var request:OpenRequest;
+
+      if (specificRequest) {
+        writeBytes(specificRequest.frame);
+        specificRequest.sent = true;
+      } else {
+        for (var key:Object in _pendingOpenRequests) {
+          request = OpenRequest(_pendingOpenRequests[key]);
+          writeBytes(request.frame);
+          request.sent = true;
+        }
+      }
+
+      try {
+        flush();
+      } catch (error:Error) {
+        destroy(ChannelErrorEvent.fromError(error));
+      }
+
+    }
+
 
     // Request to open a channel. Return true if request went well, else
     // false.
     internal function requestOpen(request:OpenRequest) : Boolean {
       var id:uint = request.id;
+      var channel:Channel;
+      var currentRequest:OpenRequest;
       var queue:Array;
 
-      if (_openChannels[id]) {
-        return false;
-      }
-
-      if (_pendingOpenRequests[id]) {
-
-        queue = _openWaitQueue[id] as Array;
-
-        if (!queue) {
-          _openWaitQueue[id] = queue = new Array();
-        }
-
-        queue.push(request);
-
-      } else if (!_handshaked) {
-        _pendingOpenRequests[id] = request;
+      if ((channel = Channel(_openChannels[id]) != null) {
+        return channel.setPendingOpenRequest(request);
+      } else if ((currentRequest = OpenRequest(_pendingOpenRequests[id]))) {
+        return currentRequest.channel.setPendingOpenRequest(request);
       } else {
         _pendingOpenRequests[id] = request;
-        writeBytes(request.frame);
-        request.sent = true;
 
-        try {
-          flush();
-        } catch (error:Error) {
-          destroy(ChannelErrorEvent.fromError(error));
-          return false;
+        if (_handshaked) {
+          flushPendingOpenRequests(request);
         }
       }
 
@@ -334,38 +333,14 @@ package hydna.net {
     // false.
     internal function cancelOpen(request:OpenRequest) : Boolean {
       var id:uint = request.id;
-      var queue:Array;
-      var index:Number;
 
       if (request.sent) {
         return false;
       }
 
-      queue = _openWaitQueue[id] as Array;
+      freeOpenRequestById(id);
 
-      if (_pendingOpenRequests[id]) {
-        delete _pendingOpenRequests[id];
-
-        if (queue != null && queue.length)  {
-          _pendingOpenRequests[id] = queue.pop();
-        }
-
-        return true;
-      }
-
-      // Should not happen...
-      if (queue == null) {
-        return false;
-      }
-
-      index = queue.indexOf(request);
-
-      if (index != -1) {
-        queue.splice(index, 1);
-        return true;
-      }
-
-      return false;
+      return true;
     }
 
 
@@ -427,19 +402,18 @@ package hydna.net {
                                       payload:ByteArray) : void {
       var request:OpenRequest;
       var channel:Channel;
-      var redirectid:uint;
       var event:Event;
       var message:String;
 
-      request = OpenRequest(_pendingOpenRequests[id]);
-
-      if (request == null) {
+      if ((request = getOpenRequestById(id))) {
         event = new ChannelErrorEvent("Server sent invalid open packet");
         destroy(event);
         return;
       }
 
       channel = request.channel;
+
+      freeOpenRequestById(id);
 
       switch (flag) {
 
@@ -473,41 +447,6 @@ package hydna.net {
           event = new ChannelErrorEvent(message || "Denied to open channel");
           channel.destroy(event);
           return;
-      }
-
-      if (_openWaitQueue[id] && _openWaitQueue[id].length) {
-
-        // Destroy all pending request IF response wasn't a
-        // redirected channel.
-        if (flag == Frame.OPEN_REDIRECT && redirectid == id) {
-          delete _pendingOpenRequests[id];
-
-          event = new ChannelErrorEvent("Channel already open");
-
-          while ((request = OpenRequest(_openWaitQueue[id].pop()))) {
-            request.channel.destroy(event);
-          }
-          return;
-        }
-
-        request = _openWaitQueue[id].pop();
-        _pendingOpenRequests[id] = request;
-
-        if (!_openWaitQueue[id].length) {
-          delete _openWaitQueue[id];
-        }
-
-        writeBytes(request.frame);
-        request.sent = true;
-
-        try {
-          flush();
-        } catch (error:Error) {
-          destroy(ChannelErrorEvent.fromError(error));
-        }
-
-      } else {
-        delete _pendingOpenRequests[id];
       }
 
     }
@@ -549,6 +488,7 @@ package hydna.net {
                                         flag:Number,
                                         payload:ByteArray) : void {
       var event:Event = null;
+      var request:OpenRequest;
       var channel:Channel;
       var packet:Frame;
       var message:String;
@@ -613,9 +553,9 @@ package hydna.net {
                 destroy(ChannelErrorEvent.fromError(error));
                 return;
               }
-            } else {
-              channel.destroy(event);
             }
+
+            channel.destroy(event);
           }
           break;
       }
@@ -636,11 +576,18 @@ package hydna.net {
       destroy(new ChannelErrorEvent("Disconnected from server"));
     }
 
+    private function getOpenRequestById (id:uint) {
+      return OpenRequest(_pendingOpenRequests[id]);
+    }
+
+    private function freeOpenRequestById (id:uint) {
+      delete _pendingOpenRequests[id];
+    }
+
     // Finalize the Socket
     private function destroy(errorEvent:Event=null) : void {
       var event:Event = errorEvent;
       var pending:Dictionary = _pendingOpenRequests;
-      var waitqueue:Dictionary = _openWaitQueue;
       var openchannels:Dictionary = _openChannels;
       var key:Object;
       var i:Number;
@@ -662,7 +609,6 @@ package hydna.net {
                                   securityErrorHandler);
 
       _pendingOpenRequests = null;
-      _openWaitQueue = null;
       _openChannels = null;
 
       if (event == null) {
@@ -672,15 +618,6 @@ package hydna.net {
       if (pending != null) {
         for (key in pending) {
           OpenRequest(pending[key]).channel.destroy(event);
-        }
-      }
-
-      if (waitqueue != null) {
-        for (key in waitqueue) {
-          queue = waitqueue[key] as Array;
-          for (i = 0, l = queue.length; i < l; i++) {
-            OpenRequest(queue[i]).channel.destroy(event);
-          }
         }
       }
 

@@ -70,6 +70,7 @@ package hydna.net {
     private var _mode:Number;
 
     private var _openRequest:OpenRequest;
+    private var _pendingOpenRequest:OpenRequest;
 
 
     /**
@@ -417,10 +418,27 @@ package hydna.net {
       }
     }
 
+    internal function setPendingOpenRequest(request:OpenRequest) : void {
+      
+      if (_closing) {
+        // Do not allow pending request if we are not closing.
+        return false;
+      }
+
+      if (_pendingOpenRequest != null) {
+        return _pendingOpenRequest.channel.setPendingOpenRequest(request);
+      }
+
+      _pendingOpenRequest = request;
+
+      return true;
+    }
+
     // Internally destroy connection.
     internal function destroy(event:Event=null) : void {
       var connection:Connection = _connection;
       var connected:Boolean = _connected;
+      var request:OpenRequest;
       var id:uint = _id;
 
       _id = 0;
@@ -429,14 +447,25 @@ package hydna.net {
       _readable = false;
       _pendingClose = null;
       _closing = false;
-      _pendingClose = null;
 
+      request = _pendingOpenRequest;
+      _pendingOpenRequest = null;
 
       if (_connection) {
         _connection.deallocChannel(connected ? id : 0);
-        _connection = null;
-      }
 
+        if (request) {
+          _connection.allocOpenRequest(request);
+          _connection.flushPendingOpenRequest(request);
+        }
+
+        _connection = null;
+      } else {
+
+        if (request) {
+          request.channel.destroy(event);
+        }
+      }
 
       if (event != null) {
         dispatchEvent(event);
