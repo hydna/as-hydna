@@ -392,7 +392,7 @@ package hydna.net {
     }
 
 
-    internal function setPendingOpenRequest(request:OpenRequest) : void {
+    internal function setPendingOpenRequest(request:OpenRequest) : Boolean {
       
       if (_closing) {
         // Do not allow pending request if we are not closing.
@@ -430,7 +430,7 @@ package hydna.net {
 
         if (request) {
           _connection.allocOpenRequest(request);
-          _connection.flushPendingOpenRequest(request);
+          _connection.flushPendingOpenRequests(request);
         }
 
         _connection.deallocChannel(connected ? id : 0);
@@ -453,7 +453,7 @@ package hydna.net {
                             priority:uint,
                             data:ByteArray,
                             offset:uint=0,
-                            length=uint=0) {
+                            length:uint=0) : void {
       var frame:Frame;
 
       if (connected == false || _connection == null) {
@@ -476,7 +476,7 @@ package hydna.net {
     private function _emit(ctype:uint,
                            data:ByteArray,
                            offset:uint=0,
-                           length=uint=0) {
+                           length:uint=0) : void {
       var frame:Frame;
 
       if (connected == false || _connection == null) {
@@ -499,10 +499,10 @@ package hydna.net {
     }
 
 
-    private function _close(ctype:uint
+    private function _close(ctype:uint,
                             data:ByteArray,
                             offset:uint=0,
-                            length:uint=0) {
+                            length:uint=0) : void {
       var frame:Frame;
 
       if (_connection == null || _closing) {
@@ -542,7 +542,7 @@ package hydna.net {
     }
 
 
-    private function flushFrame(frame:Frame) {
+    private function flushFrame(frame:Frame) : void {
       try {
         _connection.writeBytes(frame);
         _connection.flush();

@@ -290,7 +290,7 @@ package hydna.net {
     }
 
 
-    internal function deallocOpenRequest(request:OpenRequest) {
+    internal function deallocOpenRequest(request:OpenRequest) : void {
       delete _pendingOpenRequests[request.id];
 
       if (--_requestRefCount == 0 && _channelRefCount == 0) {
@@ -299,7 +299,7 @@ package hydna.net {
     }
 
 
-    internal function flushPendingOpenRequests(specificRequest:OpenRequest=null) {
+    internal function flushPendingOpenRequests(specificRequest:OpenRequest=null) : void {
       var request:OpenRequest;
 
       if (specificRequest) {
@@ -330,7 +330,7 @@ package hydna.net {
       var currentRequest:OpenRequest;
       var queue:Array;
 
-      if ((channel = Channel(_openChannels[id]) != null) {
+      if ((channel = Channel(_openChannels[id])) != null) {
         return channel.setPendingOpenRequest(request);
       } else if ((currentRequest = OpenRequest(_pendingOpenRequests[id]))) {
         return currentRequest.channel.setPendingOpenRequest(request);
@@ -588,7 +588,7 @@ package hydna.net {
     }
 
 
-    private function getOpenRequestById (id:uint) {
+    private function getOpenRequestById (id:uint) : OpenRequest {
       return OpenRequest(_pendingOpenRequests[id]);
     }
 
