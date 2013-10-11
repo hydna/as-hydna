@@ -430,7 +430,7 @@ package hydna.net {
 
         if (request) {
           _connection.allocOpenRequest(request);
-          _connection.flushPendingOpenRequests(request);
+          _connection.flushRequests(request);
         }
 
         _connection.deallocChannel(connected ? id : 0);

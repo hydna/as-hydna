@@ -251,7 +251,7 @@ package hydna.net {
           _receiveBuffer = new ByteArray();
           this.addEventListener(ProgressEvent.SOCKET_DATA, receiveHandler);
 
-          flushPendingOpenRequests();
+          flushRequests();
 
           return;
 
@@ -299,7 +299,7 @@ package hydna.net {
     }
 
 
-    internal function flushPendingOpenRequests(specificRequest:OpenRequest=null) : void {
+    internal function flushRequests(specificRequest:OpenRequest=null) : void {
       var request:OpenRequest;
 
       if (specificRequest) {
@@ -339,7 +339,7 @@ package hydna.net {
         allocOpenRequest(request);
 
         if (_handshaked) {
-          flushPendingOpenRequests(request);
+          flushRequests(request);
         }
       }
 
