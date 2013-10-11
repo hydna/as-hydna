@@ -401,6 +401,7 @@ package hydna.net {
           if (ctype == Frame.PAYLOAD_UTF) {
             try {
               message = data.readUTFBytes(data.length);
+              data.position = 0;
             } catch (err:EOFError) {
               destroy(ChannelErrorEvent.fromError(err));
               return;
@@ -441,7 +442,7 @@ package hydna.net {
       var channel:Channel;
       var event:Event;
 
-      if ((request = getOpenRequestById(id))) {
+      if ((request = getOpenRequestById(id)) == null) {
         event = new ChannelErrorEvent("Server sent invalid open packet");
         destroy(event);
         return;
