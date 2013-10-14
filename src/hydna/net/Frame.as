@@ -46,6 +46,7 @@ package hydna.net {
     internal static const OPEN:Number = 0x01;
     internal static const DATA:Number = 0x02;
     internal static const SIGNAL:Number = 0x03;
+    internal static const RESOLVE:Number = 0x04;
 
     // Open Flags
     internal static const OPEN_SUCCESS:Number = 0x0;

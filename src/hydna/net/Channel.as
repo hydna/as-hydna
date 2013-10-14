@@ -55,6 +55,7 @@ package hydna.net {
     public static var PAYLOAD_MAX_SIZE:Number = Frame.PAYLOAD_MAX_SIZE;
 
     private var _id:uint = 0;
+    private var _path:String = null;
     private var _url:String = null;
     private var _token:String = null;
     private var _closing:Boolean = false;
@@ -72,6 +73,11 @@ package hydna.net {
     private var _openRequest:OpenRequest;
     private var _pendingOpenRequest:OpenRequest;
 
+    /**
+     *  Initializes a new Channel instance
+     */
+    public function Channel() {
+    }
 
     /**
      *  Returns the ID of this Channel instance.
@@ -83,9 +89,12 @@ package hydna.net {
     }
 
     /**
-     *  Initializes a new Channel instance
+     *  Returns the path of this Channel instance.
+     *
+     *  @return {String} the specified path.
      */
-    public function Channel() {
+    public function get path() : String {
+      return _path;
     }
 
     /**
@@ -152,10 +161,9 @@ package hydna.net {
     public function connect(url:String, mode:Number=ChannelMode.READ) : void {
       var connurl:String;
       var urlobj:Object;
-      var frame:Frame;
+      var openFrame:Frame;
       var request:OpenRequest;
-      var token:ByteArray = null;
-      var id:Number;
+      var token:String;
 
       if (_connection) {
         throw new Error("Already connected");
@@ -169,6 +177,10 @@ package hydna.net {
         url = "http://" + url;
       }
 
+      if (mode < 0 || mode > ChannelMode.READWRITEEMIT) {
+        throw new Error("Invalid mode");
+      }
+
       urlobj = URLParser.parse(url);
 
       if (urlobj.protocol == "https") {
@@ -179,32 +191,14 @@ package hydna.net {
         throw new Error("Unsupported protocol, expected HTTP/HTTPS");
       }
 
-      if (!urlobj.host) {
-        throw new Error("Expected hostname");
-      }
+      _path = urlobj.path || '/';
 
-      if (urlobj.host.length > 256) {
-        throw new Error("Hostname must not exceed 256 characters");
-      }
-
-      if (urlobj.path) {
-        id = parseInt((urlobj.path.charAt(0) == "x" ? "0" : "") + urlobj.path);
-      } else {
-        id = 1;
-      }
-
-      if (id < 1 || id > 0xFFFFFFFF) {
-        throw new Error("Out of range, expected channel id" +
-                        "between 0x1 and 0xFFFFFFFF");
+      if (_path.charAt(0) != '/') {
+        _path = '/' + _path;
       }
 
       if (urlobj.paramStr) {
-        token = new ByteArray();
-        token.writeUTFBytes(decodeURIComponent(urlobj.paramStr));
-      }
-
-      if (mode < 0 || mode > ChannelMode.READWRITEEMIT) {
-        throw new Error("Invalid mode");
+        token = urlobj.paramStr; 
       }
 
       _mode = mode;
@@ -228,9 +222,7 @@ package hydna.net {
       // Ref count
       _connection.allocChannel();
 
-      frame = new Frame(id, Frame.PAYLOAD_UTF, Frame.OPEN, mode, token);
-
-      request = new OpenRequest(this, id, frame);
+      request = new OpenRequest(this, _path, _mode, token);
 
       if (_connection.requestOpen(request) == false) {
         throw new Error("Channel is already open");
@@ -415,8 +407,10 @@ package hydna.net {
       var connected:Boolean = _connected;
       var request:OpenRequest;
       var id:uint = _id;
+      var path:String = _path;
 
       _id = 0;
+      _path = null;
       _connected = false;
       _writable = false;
       _readable = false;
@@ -433,7 +427,7 @@ package hydna.net {
           _connection.flushRequests(request);
         }
 
-        _connection.deallocChannel(connected ? id : 0);
+        _connection.deallocChannel(path, connected ? id : 0);
 
         _connection = null;
       } else {

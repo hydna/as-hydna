@@ -81,9 +81,9 @@ package hydna.net {
 
     private var _pendingOpenRequests:Dictionary;
     private var _openChannels:Dictionary;
+    private var _openChannelsByPath:Dictionary;
 
     private var _channelRefCount:Number = 0;
-    private var _requestRefCount:Number = 0;
 
 
     {
@@ -127,6 +127,7 @@ package hydna.net {
 
       _pendingOpenRequests = new Dictionary();
       _openChannels = new Dictionary();
+      _openChannelsByPath = new Dictionary();
 
       addEventListener(Event.CLOSE, closeHandler);
       addEventListener(IOErrorEvent.IO_ERROR, errorHandler);
@@ -272,30 +273,29 @@ package hydna.net {
 
 
     // Decrease the reference count
-    internal function deallocChannel(id:uint=0) : void {
+    internal function deallocChannel(path:String, id:Number) : void {
+
+      if (path != null && _openChannelsByPath) {
+        delete _openChannelsByPath[path];
+      }
 
       if (id != 0 && _openChannels) {
         delete _openChannels[id];
       }
 
-      if (--_channelRefCount == 0 && _requestRefCount == 0) {
+      if (--_channelRefCount == 0) {
         destroy();
       }
     }
 
 
     internal function allocOpenRequest(request:OpenRequest) : void {
-      _requestRefCount++;
-      _pendingOpenRequests[request.id] = request;
+      _pendingOpenRequests[request.path] = request;
     }
 
 
     internal function deallocOpenRequest(request:OpenRequest) : void {
-      delete _pendingOpenRequests[request.id];
-
-      if (--_requestRefCount == 0 && _channelRefCount == 0) {
-        destroy();
-      }
+      delete _pendingOpenRequests[request.path];
     }
 
 
@@ -303,12 +303,16 @@ package hydna.net {
       var request:OpenRequest;
 
       if (specificRequest) {
-        writeBytes(specificRequest.frame);
-        specificRequest.sent = true;
+        if (specificRequest.id != 0) {
+          writeBytes(specificRequest.openFrame);
+          specificRequest.sent = true;
+        } else {
+          writeBytes(specificRequest.resolveFrame);
+        }
       } else {
         for (var key:Object in _pendingOpenRequests) {
           request = OpenRequest(_pendingOpenRequests[key]);
-          writeBytes(request.frame);
+          writeBytes(request.resolveFrame);
           request.sent = true;
         }
       }
@@ -325,14 +329,14 @@ package hydna.net {
     // Request to open a channel. Return true if request went well, else
     // false.
     internal function requestOpen(request:OpenRequest) : Boolean {
-      var id:uint = request.id;
+      var path:String = request.path;
       var channel:Channel;
       var currentRequest:OpenRequest;
       var queue:Array;
 
-      if ((channel = Channel(_openChannels[id])) != null) {
+      if ((channel = Channel(_openChannelsByPath[path])) != null) {
         return channel.setPendingOpenRequest(request);
-      } else if ((currentRequest = OpenRequest(_pendingOpenRequests[id]))) {
+      } else if ((currentRequest = OpenRequest(_pendingOpenRequests[path]))) {
         return currentRequest.channel.setPendingOpenRequest(request);
       } else {
 
@@ -350,7 +354,6 @@ package hydna.net {
     // Try to cancel an open request. Returns true on success else
     // false.
     internal function cancelOpen(request:OpenRequest) : Boolean {
-      var id:uint = request.id;
 
       if (request.sent) {
         return false;
@@ -424,6 +427,10 @@ package hydna.net {
 
           case Frame.SIGNAL:
             processSignalFrame(id, flag, data, message);
+            break;
+
+          case Frame.RESOLVE:
+            processResolveFrame(id, flag, data, message);
             break;
         }
       }
@@ -572,6 +579,25 @@ package hydna.net {
     }
 
 
+    private function processResolveFrame(id:uint,
+                                         flag:Number,
+                                         data:ByteArray,
+                                         message:String) : void {
+      var request:OpenRequest;
+      var event:Event;
+
+      if ((request = getOpenRequestByPath(message))) {
+        if (flag == Frame.OPEN_SUCCESS) {
+          request.id = id;
+          flushRequests(request);
+        } else {
+          event = new ChannelErrorEvent("Unable to resolve channel path");
+          request.channel.destroy(event);
+        }
+      }
+    }
+
+
     private function securityErrorHandler(event:SecurityErrorEvent) : void {
       destroy(new ChannelErrorEvent("Security error"));
     }
@@ -589,8 +615,24 @@ package hydna.net {
     }
 
 
-    private function getOpenRequestById (id:uint) : OpenRequest {
-      return OpenRequest(_pendingOpenRequests[id]);
+    private function getOpenRequestById(id:uint) : OpenRequest {
+      var requests:Dictionary = _pendingOpenRequests;
+      var request:OpenRequest;
+      var key:Object;
+      
+      for (key in requests) {
+        request = OpenRequest(requests[key]);
+        if (request.id == id) {
+          return request;
+        }
+      }
+
+      return null;
+    }
+
+
+    private function getOpenRequestByPath(path:String) : OpenRequest {
+      return OpenRequest(_pendingOpenRequests[path]);
     }
 
 
@@ -598,7 +640,7 @@ package hydna.net {
     private function destroy(errorEvent:Event=null) : void {
       var event:Event = errorEvent;
       var pending:Dictionary = _pendingOpenRequests;
-      var openchannels:Dictionary = _openChannels;
+      var openchannels:Dictionary = _openChannelsByPath;
       var key:Object;
       var i:Number;
       var l:Number;
@@ -619,6 +661,7 @@ package hydna.net {
                                   securityErrorHandler);
 
       _pendingOpenRequests = null;
+      _openChannelsByPath = null;
       _openChannels = null;
 
       if (event == null) {

@@ -44,25 +44,59 @@ package hydna.net {
 
     internal var _channel:Channel;
     internal var _id:uint;
-    internal var _frame:Frame;
+    internal var _path:String;
+    internal var _mode:Number;
     internal var _sent:Boolean;
+    internal var _token:String;
 
-    public function OpenRequest(channel:Channel, id:uint, frame:Frame) {
+    public function OpenRequest(channel:Channel,
+                                path:String,
+                                mode:Number,
+                                token:String) {
       _channel = channel;
-      _id = id;
-      _frame = frame;
+      _path = path;
+      _mode = mode;
+      _token = token;
     }
 
     public function get channel() : Channel {
       return _channel;
     }
 
+    public function set id(value:uint) : void {
+      _id = value;
+    }
+
     public function get id() : uint {
       return _id;
     }
 
-    public function get frame() : Frame {
-      return _frame;
+    public function get path() : String {
+      return _path;
+    }
+
+    public function get openFrame() : Frame {
+      var frame:Frame;
+      var token:ByteArray;
+
+      token = new ByteArray();
+      token.writeUTFBytes(decodeURIComponent(_token));
+
+      frame = new Frame(_id, Frame.PAYLOAD_UTF, Frame.OPEN, _mode, token);
+
+      return frame;
+    }
+
+    public function get resolveFrame() : Frame {
+      var frame: Frame;
+      var path:ByteArray;
+
+      path = new ByteArray();
+      path.writeUTFBytes(_path);
+
+      frame = new Frame(0, Frame.PAYLOAD_UTF, Frame.RESOLVE, 0, path);
+
+      return frame;
     }
 
     public function get sent() : Boolean {
