@@ -74,7 +74,7 @@ package {
          starttime = (new Date()).getTime();
 
          for (var i:Number = 0; i < MESSAGE_COUNT; i++) {
-           channel.writeUTF(MESSAGE);
+           channel.write(MESSAGE);
          }
       });
 

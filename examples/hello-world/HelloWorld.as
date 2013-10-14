@@ -55,7 +55,7 @@ package {
    */
   public class HelloWorld extends Sprite {
     // Replace ADDRESS with your own domain
-    public static const ADDRESS:String = "public.hydna.net";
+    public static const ADDRESS:String = "testing.hydna.net/test";
 
     public function HelloWorld() {
       var channel:Channel;
@@ -68,11 +68,11 @@ package {
 
       channel.addEventListener("open", function(e:Event) : void {
         trace("Connected with Hydna, sending a 'Hello'.");
-        channel.writeUTFBytes("ping");
+        channel.write("ping");
       });
 
       channel.addEventListener("data", function(e:ChannelDataEvent) : void {
-        trace("Data received: " + e.data.readUTFBytes(e.data.length));
+        trace("Data received: " + e.message);
         trace("Emitting a signal");
         channel.emit("ping");
       });
