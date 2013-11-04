@@ -19,7 +19,7 @@ package {
 
   public class SignalTest extends Test {
 
-    private static const PING:String = "PING";
+    private static const PING:String = "ping";
 
     private var channel:Channel;
 

@@ -38,12 +38,13 @@ package {
     private var _currentPhase:String;
 
     private var _channels:Array;
+    private var _teardownCount:Number;
 
     public function Test (name:String) {
       _name = name;
       _currentPhase = "NA";
       _channels = new Array();
-      _testTimer = new Timer(5000, 1);
+      _testTimer = new Timer(8000, 1);
       _testTimer.addEventListener(TimerEvent.TIMER_COMPLETE, timeoutHandler);
     }
 
@@ -108,9 +109,13 @@ package {
 
 
     protected function runDone () : void {
-      _currentPhase = "complete";
-      _testTimer.stop();
-      dispatchEvent(new Event(COMPLETE));
+      _currentPhase = "teardown";
+      try {
+        teardown();
+      } catch (err:Error) {
+        raiseError(err.message);
+        return;
+      }      
     }
 
 
@@ -124,6 +129,27 @@ package {
     }
 
 
+    protected function teardown () : void {
+      _teardownCount = _channels.length;
+
+      if (_teardownCount == 0) {
+        complete();
+        return;
+      }
+
+      for each (var channel:Channel in _channels) {
+        channel.close();
+      }
+    }
+
+
+    protected function complete () : void {
+      _currentPhase = "complete";
+      _testTimer.stop();
+      dispatchEvent(new Event(COMPLETE));
+    }
+
+
     protected function log (text:String) : void {
       dispatchEvent(new TextEvent(LOG, false, false, text));
     }
@@ -134,18 +160,35 @@ package {
     }
 
 
+    protected function assertEqual (str1:String, str2:String) : void {
+      if (str1 !== str2) {
+        throw new Error("Not equal");
+      }
+    }
+
+
     private function channelErrorHandler (e:ChannelErrorEvent) : void {
       raiseError(e.text);
     }
 
 
     private function channelCloseHandler (e:ChannelCloseEvent) : void {
-      raiseError("Unexpected closed");
+      if (_currentPhase != "teardown") {
+        raiseError("Unexpected closed");
+        return;
+      }
+
+      if (--_teardownCount == 0) {
+        complete();
+      }
+      
     }
+
 
     private function timeoutHandler (e:TimerEvent) : void {
       raiseError("TIMEOUT");
     }
+
 
     private function raiseError (message:String) : void {
 

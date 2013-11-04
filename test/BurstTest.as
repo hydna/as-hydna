@@ -41,10 +41,9 @@ package {
       var data:String = "djasdkjsajdlkasjdjaskldjlkasjdkasjkldjaskljdklasj";
       var count:Number = MESSAGES;
 
-      appendLog("Burst done");
-
       channel.addEventListener(ChannelDataEvent.DATA,
         function (e:ChannelDataEvent) : void {
+          assertEqual(e.message, data);
           if (--count == 0) {
             runDone();
           }
