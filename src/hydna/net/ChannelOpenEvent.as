@@ -34,39 +34,14 @@
 
 package hydna.net {
 
-  import flash.events.Event;
+
   import flash.utils.ByteArray;
 
-  public class ChannelOpenEvent extends Event {
 
-    public static const OPEN:String = "open";
+  public class ChannelOpenEvent extends ChannelEvent {
 
-    private var _data:ByteArray = null;
-    private var _message:String = null;
-
-
-    public function ChannelOpenEvent(data:ByteArray, message:String=null) {
-      super(OPEN, false, false);
-
-      _data = data;
-      _message = message;
-    }
-
-
-    /**
-     *  Returns the data associated with this ChannelOpenEvent instance.
-     */
-    public function get data() : ByteArray {
-      return _data;
-    }
-
-
-    /**
-     *  Returns the message associated with this ChannelOpenEvent
-     *  instance. The property is null if message was of type binary.
-     */
-    public function get message() : String {
-      return _message;
+    public function ChannelOpenEvent(ctype:Number, data:ByteArray) {
+      super(ChannelEvent.OPEN, ctype, data);
     }
 
   }

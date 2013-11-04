@@ -35,28 +35,68 @@
 package hydna.net {
 
 
+  import flash.events.Event;
+  import flash.errors.EOFError;
   import flash.utils.ByteArray;
 
 
-  public class ChannelDataEvent extends ChannelEvent {
+  public class ChannelEvent extends Event {
+
+    public static const OPEN:String = "open";
+    public static const DATA:String = "data";
+    public static const SIGNAL:String = "signal";
+    public static const CLOSE:String = "close";
+
+    private var _data:ByteArray = null;
+    private var _message:String = null;
+    private var _ctype:Number = Frame.PAYLOAD_UTF;
 
 
-    private var _priority:Number
-
-
-    public function ChannelDataEvent(ctype:Number,
-                                     data:ByteArray,
-                                     priority:Number) {
-      super(ChannelEvent.DATA, ctype, data);
-      _priority = priority;
+    public function ChannelEvent(type:String,
+                                 ctype:Number,
+                                 data:ByteArray) {
+      super(type, false, true);
+      _ctype = ctype;
+      _data = data;
     }
 
 
     /**
-     *  Returns the priority of data.
+     *  Returns the data associated with this ChannelEvent instance.
      */
-    public function get priority() : Number {
-      return _priority;
+    public function get data() : ByteArray {
+      return _data;
+    }
+
+
+    /**
+     *  Returns the message associated with this ChannelEvent
+     *  instance. The property is null if message was of type binary or 
+     *  if an encoding error occured.
+     */
+    public function get message() : String {
+      var oldpos:uint;
+
+      if (_message != null) {
+        return _message;
+      }
+
+      if (_data == null) {
+        return null;
+      }
+
+      if (_ctype == Frame.PAYLOAD_UTF) {
+        try {
+          oldpos = _data.position;
+          _message = _data.readUTFBytes(_data.length);
+        } catch (err:EOFError) {
+          _message = null;
+        } finally {
+          _data.position = oldpos;
+        }
+      }
+
+      return _message;
     }
 
   }

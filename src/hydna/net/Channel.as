@@ -359,8 +359,8 @@ package hydna.net {
 
     // Internal callback for open success
     internal function openSuccess(id:uint,
-                                  data:ByteArray,
-                                  message:String=null) : void {
+                                  ctype:Number,
+                                  data:ByteArray) : void {
       var frame:Frame;
 
       _openRequest = null;
@@ -379,7 +379,7 @@ package hydna.net {
         flushFrame(frame);
 
       } else {
-        dispatchEvent(new ChannelOpenEvent(data, message));
+        dispatchEvent(new ChannelOpenEvent(ctype, data));
       }
     }
 

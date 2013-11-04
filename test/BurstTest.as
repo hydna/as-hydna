@@ -9,10 +9,7 @@ package {
   import flash.utils.ByteArray;
   import flash.utils.Dictionary;
 
-  import hydna.net.ChannelOpenEvent;
-  import hydna.net.ChannelErrorEvent;
-  import hydna.net.ChannelDataEvent;
-  import hydna.net.ChannelSignalEvent;
+  import hydna.net.ChannelEvent;
   import hydna.net.Channel;
   import hydna.net.ChannelMode;
   import hydna.net.URLParser;
@@ -31,7 +28,7 @@ package {
 
     override protected function setup () : void {
       channel = createChannel(ChannelMode.READWRITE);
-      channel.addEventListener(ChannelOpenEvent.OPEN, function (e:Event) : void {
+      channel.addEventListener(ChannelEvent.OPEN, function (e:Event) : void {
         setupDone();
       });
     }
@@ -41,8 +38,8 @@ package {
       var data:String = "djasdkjsajdlkasjdjaskldjlkasjdkasjkldjaskljdklasj";
       var count:Number = MESSAGES;
 
-      channel.addEventListener(ChannelDataEvent.DATA,
-        function (e:ChannelDataEvent) : void {
+      channel.addEventListener(ChannelEvent.DATA,
+        function (e:ChannelEvent) : void {
           assertEqual(e.message, data);
           if (--count == 0) {
             runDone();

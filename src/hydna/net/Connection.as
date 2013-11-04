@@ -375,7 +375,6 @@ package hydna.net {
       var ctype:Number;
       var desc:Number;
       var data:ByteArray;
-      var message:String;
 
       readBytes(_receiveBuffer, _receiveBuffer.length, bytesAvailable);
 
@@ -388,7 +387,6 @@ package hydna.net {
         }
 
         data = null;
-        message = null;
 
         id = _receiveBuffer.readUnsignedInt();
         desc = _receiveBuffer.readUnsignedByte();
@@ -400,16 +398,6 @@ package hydna.net {
         if (size - Frame.HEADER_SIZE) {
           data = new ByteArray();
           _receiveBuffer.readBytes(data, 0, size - Frame.HEADER_SIZE);
-
-          if (ctype == Frame.PAYLOAD_UTF) {
-            try {
-              message = data.readUTFBytes(data.length);
-              data.position = 0;
-            } catch (err:EOFError) {
-              destroy(ChannelErrorEvent.fromError(err));
-              return;
-            }
-          }
         }
 
         switch (op) {
@@ -418,19 +406,19 @@ package hydna.net {
             break;
 
           case Frame.OPEN:
-            processOpenFrame(id, flag, data, message);
+            processOpenFrame(id, ctype, flag, data);
             break;
 
           case Frame.DATA:
-            processDataFrame(id, flag, data, message);
+            processDataFrame(id, ctype, flag, data);
             break;
 
           case Frame.SIGNAL:
-            processSignalFrame(id, flag, data, message);
+            processSignalFrame(id, ctype, flag, data);
             break;
 
           case Frame.RESOLVE:
-            processResolveFrame(id, flag, data, message);
+            processResolveFrame(id, ctype, flag, data);
             break;
         }
       }
@@ -442,9 +430,9 @@ package hydna.net {
 
     // process an open packet
     private function processOpenFrame(id:uint,
+                                      ctype:Number,
                                       flag:Number,
-                                      data:ByteArray,
-                                      message:String) : void {
+                                      data:ByteArray) : void {
       var request:OpenRequest;
       var channel:Channel;
       var event:Event;
@@ -461,11 +449,13 @@ package hydna.net {
 
         case Frame.OPEN_SUCCESS:
           _openChannels[id] = channel;
-          channel.openSuccess(request.id, data, message);
+          channel.openSuccess(request.id, ctype, data);
           break;
 
         default:
-          event = new ChannelErrorEvent(message || "Denied to open channel");
+          event = ChannelErrorEvent.fromData(ctype,
+                                             data,
+                                             "Denied to open channel");
           channel.destroy(event);
           return;
       }
@@ -476,12 +466,11 @@ package hydna.net {
 
     // process a data packet
     private function processDataFrame(id:uint,
+                                      ctype:Number,
                                       flag:Number,
-                                      data:ByteArray,
-                                      message:String) : void {
+                                      data:ByteArray) : void {
       var channel:Channel;
       var event:Event;
-      var packet:Frame;
 
       if (data == null || data.length == 0) {
         destroy(new ChannelErrorEvent("Zero data packet sent received"));
@@ -490,7 +479,7 @@ package hydna.net {
 
       if (id == BROADCAST_ALL) {
         for (var key:String in _openChannels) {
-          event = new ChannelDataEvent(flag, data, message);
+          event = new ChannelDataEvent(ctype, data, flag);
           channel = Channel(_openChannels[key]);
           channel.dispatchEvent(event);
         }
@@ -501,7 +490,7 @@ package hydna.net {
           return;
         }
 
-        event = new ChannelDataEvent(flag, data, message);
+        event = new ChannelDataEvent(ctype, data, flag);
 
         channel.dispatchEvent(event);
       }
@@ -510,9 +499,9 @@ package hydna.net {
 
     // process a signal packet
     private function processSignalFrame(id:uint,
+                                        ctype:Number,
                                         flag:Number,
-                                        data:ByteArray,
-                                        message:String) : void {
+                                        data:ByteArray) : void {
       var event:Event = null;
       var request:OpenRequest;
       var channel:Channel;
@@ -521,7 +510,7 @@ package hydna.net {
       switch (flag) {
 
         case Frame.SIG_EMIT:
-          event = new ChannelSignalEvent(data, message);
+          event = new ChannelSignalEvent(ctype, data);
 
           if (id == BROADCAST_ALL) {
             for (var key:String in _openChannels) {
@@ -539,12 +528,12 @@ package hydna.net {
 
         case Frame.SIG_END:
 
-          event = new ChannelCloseEvent(data, message);
+          event = new ChannelCloseEvent(ctype, data);
 
         default:
 
           if (event == null) {
-            event = new ChannelErrorEvent(message || 'UNKNOWN_ERROR');
+            event = ChannelErrorEvent.fromData(ctype, data);
           }
 
           if (id == BROADCAST_ALL) {
@@ -580,13 +569,13 @@ package hydna.net {
 
 
     private function processResolveFrame(id:uint,
+                                         ctype:Number,
                                          flag:Number,
-                                         data:ByteArray,
-                                         message:String) : void {
+                                         data:ByteArray) : void {
       var request:OpenRequest;
       var event:Event;
 
-      if ((request = getOpenRequestByPath(message))) {
+      if ((request = getOpenRequestByPath(ctype, data))) {
         if (flag == Frame.OPEN_SUCCESS) {
           request.id = id;
           flushRequests(request);
@@ -631,8 +620,23 @@ package hydna.net {
     }
 
 
-    private function getOpenRequestByPath(path:String) : OpenRequest {
-      return OpenRequest(_pendingOpenRequests[path]);
+    private function getOpenRequestByPath(ctype:Number, data:ByteArray)
+      : OpenRequest {
+      var path:String;
+      var oldpos:uint;
+
+      if (ctype == Frame.PAYLOAD_UTF) {
+        try {
+          oldpos = data.position;
+          path = data.readUTFBytes(data.length);
+          return OpenRequest(_pendingOpenRequests[path]);
+        } catch (err:EOFError) {
+        } finally {
+          data.position = oldpos;
+        }
+      }
+
+      return null;
     }
 
 

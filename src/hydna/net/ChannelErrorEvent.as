@@ -36,6 +36,7 @@ package hydna.net {
 
   import flash.events.ErrorEvent;
   import flash.utils.ByteArray;
+  import flash.errors.EOFError;
 
   public class ChannelErrorEvent extends ErrorEvent {
 
@@ -63,6 +64,32 @@ package hydna.net {
 
     public static function fromEvent(event:ErrorEvent): ChannelErrorEvent {
       return new ChannelErrorEvent(event.text, 0xFFFF);
+    }
+
+    public static function fromData(ctype:Number,
+                                    data:ByteArray,
+                                    defaultMessage:String=null)
+                                    : ChannelErrorEvent {
+      var oldpos:uint;
+      var message:String;
+
+      if (data == null) {
+        return new ChannelErrorEvent(defaultMessage || "Unknown Error");
+      }
+
+      if (ctype == Frame.PAYLOAD_UTF) {
+        try {
+          oldpos = data.position;
+          message = data.readUTFBytes(data.length);
+          return new ChannelErrorEvent(message);
+        } catch (err:EOFError) {
+          return new ChannelErrorEvent(defaultMessage || "Unknown Error");
+        } finally {
+          data.position = oldpos;
+        }
+      }
+
+      return new ChannelErrorEvent(defaultMessage || "Unknown Error");
     }
   }
 }

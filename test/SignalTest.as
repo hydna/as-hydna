@@ -9,10 +9,7 @@ package {
   import flash.utils.ByteArray;
   import flash.utils.Dictionary;
 
-  import hydna.net.ChannelOpenEvent;
-  import hydna.net.ChannelErrorEvent;
-  import hydna.net.ChannelDataEvent;
-  import hydna.net.ChannelSignalEvent;
+  import hydna.net.ChannelEvent;
   import hydna.net.Channel;
   import hydna.net.ChannelMode;
   import hydna.net.URLParser;
@@ -31,7 +28,7 @@ package {
 
     override protected function setup () : void {
       channel = createChannel(ChannelMode.READWRITEEMIT, "/ping-back");
-      channel.addEventListener(ChannelOpenEvent.OPEN,
+      channel.addEventListener(ChannelEvent.OPEN,
         function (e:Event) : void {
           setupDone();
         }
@@ -40,8 +37,8 @@ package {
 
 
     override protected function run () : void {
-      channel.addEventListener("signal",
-        function (e:ChannelSignalEvent) {
+      channel.addEventListener(ChannelEvent.SIGNAL,
+        function (e:ChannelEvent) {
           runDone();
         }
       )

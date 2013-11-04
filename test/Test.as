@@ -12,11 +12,8 @@ package {
   import flash.utils.Dictionary;
   import flash.utils.Timer;
 
-  import hydna.net.ChannelOpenEvent;
-  import hydna.net.ChannelCloseEvent;
+  import hydna.net.ChannelEvent;
   import hydna.net.ChannelErrorEvent;
-  import hydna.net.ChannelDataEvent;
-  import hydna.net.ChannelSignalEvent;
   import hydna.net.Channel;
   import hydna.net.ChannelMode;
   import hydna.net.URLParser;
@@ -91,7 +88,7 @@ package {
 
       channel.connect(url, mode);
       channel.addEventListener("error", channelErrorHandler);
-      channel.addEventListener(ChannelCloseEvent.CLOSE, channelCloseHandler);
+      channel.addEventListener(ChannelEvent.CLOSE, channelCloseHandler);
       _channels.push(channel);
       return channel;
     }
@@ -172,7 +169,7 @@ package {
     }
 
 
-    private function channelCloseHandler (e:ChannelCloseEvent) : void {
+    private function channelCloseHandler (e:ChannelEvent) : void {
       if (_currentPhase != "teardown") {
         raiseError("Unexpected closed");
         return;
