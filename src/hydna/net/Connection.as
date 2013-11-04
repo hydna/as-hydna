@@ -68,7 +68,6 @@ package hydna.net {
 
     private static var availableSockets:Dictionary;
 
-    private var _attempt:Number;
     private var _handshakeBuffer:String;
 
     private var _connecting:Boolean = false;
@@ -162,7 +161,6 @@ package hydna.net {
 
       _urlobj = urlobj;
 
-      _attempt = _attempt ? _attempt + 1 : 1;
       _handshakeBuffer = "";
 
       _connecting = true;
