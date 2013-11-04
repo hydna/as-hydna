@@ -80,24 +80,6 @@ package hydna.net {
     }
 
     /**
-     *  Returns the ID of this Channel instance.
-     *
-     *  @return {Number} the specified ID number.
-     */
-    public function get id() : uint {
-      return _id;
-    }
-
-    /**
-     *  Returns the path of this Channel instance.
-     *
-     *  @return {String} the specified path.
-     */
-    public function get path() : String {
-      return _path;
-    }
-
-    /**
      *  Return the connected state for this Channel instance.
      */
     public function get connected() : Boolean {
