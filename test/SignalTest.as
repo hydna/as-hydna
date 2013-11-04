@@ -42,11 +42,9 @@ package {
     override protected function run () : void {
       channel.addEventListener("signal",
         function (e:ChannelSignalEvent) {
-          appendLog("emit received");
           runDone();
         }
       )
-      appendLog("send emit");
       channel.emit(PING);
     }
   }
