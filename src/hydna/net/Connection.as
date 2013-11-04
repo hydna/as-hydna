@@ -35,6 +35,7 @@
 package hydna.net {
 
   import flash.events.Event;
+  import flash.events.ErrorEvent;
   import flash.events.IOErrorEvent;
   import flash.events.ProgressEvent;
   import flash.events.SecurityErrorEvent;
@@ -43,20 +44,16 @@ package hydna.net {
   import flash.net.Socket;
   import flash.utils.ByteArray;
   import flash.utils.Dictionary;
+  import flash.utils.getDefinitionByName;
 
-  import hydna.net.OpenRequest;
-  import hydna.net.Frame;
-  import hydna.net.Channel;
-  import hydna.net.ChannelDataEvent;
-  import hydna.net.ChannelErrorEvent;
-  import hydna.net.ChannelSignalEvent;
-  import hydna.net.ChannelCloseEvent;
-  import hydna.net.URLParser;
 
   // Internal wrapper around flash.net.Socket
-  internal class Connection extends Socket {
+  internal class Connection {
+
+    private static const PROTOCOL_VERSION:String = "winksock/1";
 
     private static const DEFAULT_PORT:Number = 80;
+    private static const DEFAULT_SECURE_PORT:Number = 443;
 
     private static const BROADCAST_ALL:Number = 0;
 
@@ -64,137 +61,189 @@ package hydna.net {
     private static const HANDSHAKE_RESP_SIZE:Number = 5;
 
     private static const SUCCESS:Number = 0;
-    private static const CUSTOM_ERR_CODE:Number = 0xf;
+    private static const CUSTOM_ERR_CODE:Number = 0x7;
 
-    private static var availableSockets:Dictionary;
+    private static const UNSECURE_CLASS:String = "flash.net.Socket";
+    private static const SECURE_CLASS:String = "flash.net.SecureSocket";
+
+    private static var connectionCollections:Dictionary;
 
     private var _handshakeBuffer:String;
 
     private var _connecting:Boolean = false;
     private var _handshaked:Boolean = false;
 
-    private var _id:String;
     private var _receiveBuffer:ByteArray;
-    private var _urlobj:Object;
     private var _url:String;
 
-    private var _pendingOpenRequests:Dictionary;
-    private var _openChannels:Dictionary;
-    private var _openChannelsByPath:Dictionary;
-
-    private var _channelRefCount:Number = 0;
+    private var _socket:Socket;
+    private var _channels:Dictionary;
+    private var _routes:Dictionary;
+    private var _refcount:Number = 0;
 
 
     {
-      availableSockets = new Dictionary();
+      connectionCollections = new Dictionary();
+    }
+
+    /***
+      Return an available connection or create a new one.
+    */
+    internal static function getConnection (instance:Channel,
+                                            urlobj:Object) : Connection {
+      var connurl:String;
+      var connection:Connection;
+
+      connurl = createConnectionUrl(urlobj);
+
+      if (connectionCollections[connurl]) {
+        for each (var conn:Connection in connectionCollections[connurl]) {
+          if (conn.containsChannel(urlobj.path) == false) {
+            connection = conn;
+            break;
+          }
+        }
+      }
+
+      if (connection == null) {
+        connection = new Connection(connurl);
+        if (!connectionCollections[connurl]) {
+          connectionCollections[connurl] = new Array();
+        }
+        connectionCollections[connurl].push(connection);
+      }
+
+      connection.createChannel(instance, urlobj.path);
+
+      return connection;
     }
 
 
-    // Return an available connection or create a new one.
-    internal static function getConnection(url:String) : Connection {
-      var urlobj:Object = URLParser.parse(url);
-      var connection:Connection;
-      var connid:String;
+    internal static function hasTlsSupport () : Boolean {
+      var SecureSocket:Class;
 
-      connid = [
-        urlobj.host,
-        ":", (urlobj.port || DEFAULT_PORT),
-        "/", urlobj.path || ""
-      ].join("");
-
-      if (availableSockets[connid]) {
-        connection = availableSockets[connid];
-      } else {
-        connection = new Connection(connid);
-        connection.handshake(urlobj);
-        availableSockets[connid] = connection;
+      try {
+        SecureSocket = getDefinitionByName(SECURE_CLASS) as Class;
+        return SecureSocket.isSupported;
+      } catch (err:ReferenceError) {
       }
 
-      return connection;
+      return false;
+    }
+
+
+    internal static function createConnectionUrl (urlobj:Object) : String {
+      var result:Array = new Array();
+
+      result = [urlobj.protocol, '://', urlobj.host];
+
+      if (urlobj.port) {
+        result.push(':' + urlobj.port);
+      }
+
+      return result.join('');
     }
 
 
     /**
      *  Initializes a new Channel instance
      */
-    public function Connection(id:String) {
-      super();
+    public function Connection(url:String) {
+      var SocketClass:Class;
 
-      _id = id;
+      _url = url;
+
+      if (isSecure) {
+        SocketClass = getDefinitionByName(SECURE_CLASS) as Class;
+      } else {
+        SocketClass = getDefinitionByName(UNSECURE_CLASS) as Class;
+      }
+
+      _socket = new SocketClass();
+
+      _socket.addEventListener(Event.CLOSE, closeHandler);
+      _socket.addEventListener(IOErrorEvent.IO_ERROR, errorHandler);
+      _socket.addEventListener(SecurityErrorEvent.SECURITY_ERROR,
+                               securityErrorHandler);
 
       _receiveBuffer = new ByteArray();
+      _channels = new Dictionary();
+      _routes = new Dictionary();
 
-      _pendingOpenRequests = new Dictionary();
-      _openChannels = new Dictionary();
-      _openChannelsByPath = new Dictionary();
-
-      addEventListener(Event.CLOSE, closeHandler);
-      addEventListener(IOErrorEvent.IO_ERROR, errorHandler);
-      addEventListener(SecurityErrorEvent.SECURITY_ERROR,
-                       securityErrorHandler);
     }
 
 
-    internal function get id()  : String {
-      return _id;
+    internal function get isSecure () : Boolean {
+      return /^https:/.test(_url);
     }
 
 
-    internal function get url() : String {
+    internal function get url () : String {
       return _url;
     }
 
 
-    internal function get handshaked() : Boolean {
+    private function get handshaked () : Boolean {
       return _handshaked;
     }
 
 
-    internal function handshake(urlobj:Object) : void {
+    private function containsChannel (path:String) : Boolean {
+      return !!(_channels[path]);
+    }
+
+
+    private function handshake () : void {
+      var urlobj:Object;
 
       if (_connecting == true) {
         throw new Error("Already connecting");
       }
 
-      addEventListener(Event.CONNECT, connectHandler);
-      addEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
+      _socket.addEventListener(Event.CONNECT, connectHandler);
+      _socket.addEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
 
-      _urlobj = urlobj;
+      urlobj = URLParser.parse(_url);
 
       _handshakeBuffer = "";
 
       _connecting = true;
 
-      connect(urlobj.host, urlobj.port || DEFAULT_PORT);
+      _socket.connect(urlobj.host, urlobj.port ||
+                                     (isSecure ? DEFAULT_SECURE_PORT
+                                               : DEFAULT_PORT));
     }
 
 
     private function connectHandler(event:Event) : void {
       var packet:Array = new Array();
+      var urlobj:Object;
+      
+      _socket.removeEventListener(Event.CONNECT, connectHandler);
 
-      removeEventListener(Event.CONNECT, connectHandler);
+      urlobj = URLParser.parse(_url);
 
       // TODO: Initialize a handshake timeout handler
 
-      packet[0] = "GET /" + (_urlobj.path || "") + " HTTP/1.1";
+      packet[0] = "GET / HTTP/1.1";
       packet[1] = "Connection: Upgrade";
-      packet[2] = "Upgrade: winksock/1";
-      packet[3] = "Host: " + _urlobj.host;
+      packet[2] = "Upgrade: " + PROTOCOL_VERSION;
+      packet[3] = "Host: " + urlobj.host;
       packet[4] = "\r\n";
 
-      this.writeMultiByte(packet.join("\r\n"), "us-ascii");
-
       try {
-        flush();
+        _socket.writeMultiByte(packet.join("\r\n"), "us-ascii");
+        _socket.flush();
       } catch (error:Error) {
-        destroy(ChannelErrorEvent.fromError(error));
+        destroyWithError(error);
         return;
       }
     }
 
 
-    private function handshakeHandler(event:ProgressEvent) : void {
-      var request:OpenRequest;
+    private function handshakeHandler (event:ProgressEvent) : void {
+      var frame:Frame;      
+      var path:ByteArray;
       var buffer:String;
       var splitted:Array;
       var head:Array;
@@ -203,7 +252,7 @@ package hydna.net {
       var m:Object;
       var status:Number;
 
-      buffer = readUTFBytes(bytesAvailable);
+      buffer = _socket.readUTFBytes(_socket.bytesAvailable);
 
       _handshakeBuffer += buffer;
 
@@ -221,17 +270,17 @@ package hydna.net {
         body = body.substr(0, body.indexOf("\r"));
       }
 
-      this.removeEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
+      _socket.removeEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
 
       m = /HTTP\/1\.1\s(\d+)/.exec(head[0]);
 
       if (!m) {
-        destroy(new ChannelErrorEvent("Bad handshake (HTTP decoding)"));
+        destroyWithError(new Error("Bad handshake (HTTP decoding)"));
         return;
       }
 
       if (isNaN(status = int(m[1]))) {
-        destroy(new ChannelErrorEvent("Bad handshake (HTTP status missing)"));
+        destroyWithError(new Error("Bad handshake (HTTP status missing)"));
         return;
       }
 
@@ -248,133 +297,115 @@ package hydna.net {
           _handshaked = true;
 
           _receiveBuffer = new ByteArray();
-          this.addEventListener(ProgressEvent.SOCKET_DATA, receiveHandler);
+          _socket.addEventListener(ProgressEvent.SOCKET_DATA, receiveHandler);
 
-          flushRequests();
-
+          for each (var channel:Channel in _channels) {
+            path = new ByteArray();
+            path.writeUTFBytes(channel.path);
+            frame = new Frame(0, Frame.PAYLOAD_UTF, Frame.RESOLVE, 0, path);
+            writeFrame(frame);
+          }
           return;
 
         default:
-          destroy(new ChannelErrorEvent("Bad handshake (" +
-                                        status + " " + body +
-                                        ")"));
+          destroyWithError(new Error("Bad handshake (" +
+                                      status + " " +
+                                      body + ")"));
           return;
       }
     }
 
 
-    // Internal method to keep track of no of channels that is associated
-    // with this connection instance.
-    internal function allocChannel() : void {
-      _channelRefCount++;
-    }
+    internal function createChannel (instance:Channel, path:String) : void {
+      var frame:Frame;
+      var data:ByteArray;
 
-
-    // Decrease the reference count
-    internal function deallocChannel(path:String, id:Number) : void {
-
-      if (path != null && _openChannelsByPath) {
-        delete _openChannelsByPath[path];
+      if (path in this._channels) {
+        throw new Error("Channel already created");
       }
 
-      if (id != 0 && _openChannels) {
-        delete _openChannels[id];
-      }
+      _channels[path] = instance;
+      _refcount++;
 
-      if (--_channelRefCount == 0) {
-        destroy();
+      if (_handshaked) {
+        data = new ByteArray();
+        data.writeUTFBytes(path);
+        frame = new Frame(0, Frame.PAYLOAD_UTF, Frame.RESOLVE, 0, data);
+        writeFrame(frame);
+      } else if (_connecting == false) {
+        handshake();
       }
     }
 
 
-    internal function allocOpenRequest(request:OpenRequest) : void {
-      _pendingOpenRequests[request.path] = request;
-    }
+    internal function destroyChannel (instance:Channel,
+                                      isError:Boolean,
+                                      ctype:Number,
+                                      data:ByteArray,
+                                      defaultMessage:String = null) : void {
+      var event:Event;
 
+      if (instance.path == null) {
+        return;
+      }
 
-    internal function deallocOpenRequest(request:OpenRequest) : void {
-      delete _pendingOpenRequests[request.path];
-    }
+      delete _channels[instance.path];
 
+      if (isNaN(instance.ptr) == false) {
+        delete _routes[instance.ptr];
+      }
 
-    internal function flushRequests(specificRequest:OpenRequest=null) : void {
-      var request:OpenRequest;
-
-      if (specificRequest) {
-        if (specificRequest.id != 0) {
-          writeBytes(specificRequest.openFrame);
-          specificRequest.sent = true;
-        } else {
-          writeBytes(specificRequest.resolveFrame);
-        }
+      if (isError) {
+        event = ChannelErrorEvent.fromData(ctype, data, defaultMessage);
       } else {
-        for (var key:Object in _pendingOpenRequests) {
-          request = OpenRequest(_pendingOpenRequests[key]);
-          writeBytes(request.resolveFrame);
-          request.sent = true;
-        }
+        event = new ChannelCloseEvent(ctype, data);
       }
 
       try {
-        flush();
+        instance.destroyHandler(event);
       } catch (error:Error) {
-        destroy(ChannelErrorEvent.fromError(error));
-      }
-
-    }
-
-
-    // Request to open a channel. Return true if request went well, else
-    // false.
-    internal function requestOpen(request:OpenRequest) : Boolean {
-      var path:String = request.path;
-      var channel:Channel;
-      var currentRequest:OpenRequest;
-      var queue:Array;
-
-      if ((channel = Channel(_openChannelsByPath[path])) != null) {
-        return channel.setPendingOpenRequest(request);
-      } else if ((currentRequest = OpenRequest(_pendingOpenRequests[path]))) {
-        return currentRequest.channel.setPendingOpenRequest(request);
-      } else {
-
-        allocOpenRequest(request);
-
-        if (_handshaked) {
-          flushRequests(request);
+      } finally {
+        _refcount--;
+        if (_refcount == 0) {
+          destroy();
         }
       }
-
-      return true;
     }
 
 
-    // Try to cancel an open request. Returns true on success else
-    // false.
-    internal function cancelOpen(request:OpenRequest) : Boolean {
-
-      if (request.sent) {
-        return false;
+    private function dispatchChannelEvent (target:Channel, event:Event) : void {
+      try {
+        target.dispatchEvent(event);
+      } catch (error:Error) {
       }
-
-      deallocOpenRequest(request);
-
-      return true;
     }
 
 
+    internal function writeFrame (frame:Frame) : Boolean {
+      try {
+        _socket.writeBytes(frame);
+        _socket.flush();
+      } catch (error:IOError) {
+        destroyWithError(error);
+        return true;
+      }
+      return false;
+    }
+ 
+ 
     // Handles all incomming data.
-    private function receiveHandler(event:ProgressEvent) : void {
-      var channel:Channel = null;
+    private function receiveHandler (event:ProgressEvent) : void {
       var size:uint;
-      var id:uint;
+      var ptr:uint;
       var op:Number;
       var flag:Number;
       var ctype:Number;
       var desc:Number;
       var data:ByteArray;
 
-      readBytes(_receiveBuffer, _receiveBuffer.length, bytesAvailable);
+      _socket.readBytes(_receiveBuffer,
+                        _receiveBuffer.length,
+                        _socket.bytesAvailable);
 
       while (_receiveBuffer.bytesAvailable >= Frame.HEADER_SIZE) {
         size = _receiveBuffer.readUnsignedShort();
@@ -386,7 +417,7 @@ package hydna.net {
 
         data = null;
 
-        id = _receiveBuffer.readUnsignedInt();
+        ptr = _receiveBuffer.readUnsignedInt();
         desc = _receiveBuffer.readUnsignedByte();
 
         ctype = (desc & Frame.CTYPE_BITMASK) >> Frame.CTYPE_BITPOS;
@@ -404,19 +435,19 @@ package hydna.net {
             break;
 
           case Frame.OPEN:
-            processOpenFrame(id, ctype, flag, data);
+            processOpenFrame(ptr, ctype, flag, data);
             break;
 
           case Frame.DATA:
-            processDataFrame(id, ctype, flag, data);
+            processDataFrame(ptr, ctype, flag, data);
             break;
 
           case Frame.SIGNAL:
-            processSignalFrame(id, ctype, flag, data);
+            processSignalFrame(ptr, ctype, flag, data);
             break;
 
           case Frame.RESOLVE:
-            processResolveFrame(id, ctype, flag, data);
+            processResolveFrame(ptr, ctype, flag, data);
             break;
         }
       }
@@ -426,139 +457,153 @@ package hydna.net {
       }
     }
 
-    // process an open packet
-    private function processOpenFrame(id:uint,
-                                      ctype:Number,
-                                      flag:Number,
-                                      data:ByteArray) : void {
-      var request:OpenRequest;
-      var channel:Channel;
-      var event:Event;
 
-      if ((request = getOpenRequestById(id)) == null) {
-        event = new ChannelErrorEvent("Server sent invalid open packet");
-        destroy(event);
+    // process an open packet
+    private function processOpenFrame (ptr:uint,
+                                       ctype:Number,
+                                       flag:Number,
+                                       data:ByteArray) : void {
+      var channel:Channel;
+
+      if ((channel = _routes[ptr] as Channel) == null) {
+        destroyWithError(new Error("Server sent invalid open packet"));
         return;
       }
 
-      channel = request.channel;
+      if (channel.connected) {
+        destroyWithError(new Error("Server sent open to an open channel"));
+        return;
+      }
 
       switch (flag) {
 
         case Frame.OPEN_SUCCESS:
-          _openChannels[id] = channel;
-          channel.openSuccess(request.id, ctype, data);
+          channel.openHandler(new ChannelOpenEvent(ctype, data));
           break;
 
         default:
-          event = ChannelErrorEvent.fromData(ctype,
-                                             data,
-                                             "Denied to open channel");
-          channel.destroy(event);
+          destroyChannel(channel, true, ctype, data, "Denied to open channel");
           return;
       }
-
-      deallocOpenRequest(request);
     }
 
 
     // process a data packet
-    private function processDataFrame(id:uint,
-                                      ctype:Number,
-                                      flag:Number,
-                                      data:ByteArray) : void {
+    private function processDataFrame (ptr:uint,
+                                       ctype:Number,
+                                       flag:Number,
+                                       data:ByteArray) : void {
       var channel:Channel;
-      var event:Event;
 
       if (data == null || data.length == 0) {
-        destroy(new ChannelErrorEvent("Zero data packet sent received"));
+        destroyWithError(new Error("Zero data packet sent received"));
         return;
       }
 
-      if (id == BROADCAST_ALL) {
-        for (var key:String in _openChannels) {
-          event = new ChannelDataEvent(ctype, data, flag);
-          channel = Channel(_openChannels[key]);
-          channel.dispatchEvent(event);
+      if (ptr == BROADCAST_ALL) {
+        for each (channel in _routes) {
+          if (channel.readable) {
+            dispatchChannelEvent(channel,
+                                 new ChannelDataEvent(ctype, data, flag));
+          }
         }
       } else {
-        channel = Channel(_openChannels[id]);
-
-        if (channel == null) {
+        if ((channel = Channel(_routes[ptr])) == null) {
           return;
         }
 
-        event = new ChannelDataEvent(ctype, data, flag);
-
-        channel.dispatchEvent(event);
+        if (channel.readable) {
+          dispatchChannelEvent(channel,
+                               new ChannelDataEvent(ctype, data, flag));
+        }
       }
     }
 
 
     // process a signal packet
-    private function processSignalFrame(id:uint,
-                                        ctype:Number,
-                                        flag:Number,
-                                        data:ByteArray) : void {
-      var event:Event = null;
-      var request:OpenRequest;
+    private function processSignalFrame (ptr:uint,
+                                         ctype:Number,
+                                         flag:Number,
+                                         data:ByteArray) : void {
       var channel:Channel;
-      var packet:Frame;
+      var frame:Frame;
 
       switch (flag) {
 
         case Frame.SIG_EMIT:
-          event = new ChannelSignalEvent(ctype, data);
 
-          if (id == BROADCAST_ALL) {
-            for (var key:String in _openChannels) {
-              channel = Channel(_openChannels[key]);
-              channel.dispatchEvent(event);
+          if (ptr == BROADCAST_ALL) {
+
+            for each (channel in _routes) {
+              if (channel.connected) {
+                dispatchChannelEvent(channel,
+                                     new ChannelSignalEvent(ctype, data));
+              }
             }
+
           } else {
-            channel = Channel(_openChannels[id]);
-            if (channel == null) {
+            if ((channel = Channel(_routes[ptr])) == null) {
               return;
             }
-            channel.dispatchEvent(event);
+
+            if (channel.connected) {
+              dispatchChannelEvent(channel,
+                                   new ChannelSignalEvent(ctype, data));
+            }
           }
           break;
 
         case Frame.SIG_END:
 
-          event = new ChannelCloseEvent(ctype, data);
-
-        default:
-
-          if (event == null) {
-            event = ChannelErrorEvent.fromData(ctype, data);
+          if (ptr == BROADCAST_ALL) {
+            return destroyWithEndSig(ctype, data);
           }
 
-          if (id == BROADCAST_ALL) {
-            destroy(event);
+          if ((channel = Channel(_routes[ptr])) == null) {
+            return;
+          }
+
+          if (channel.connected == false) {
+            return;
+          }
+
+          if (channel.closing == false) {
+            // We havent closed our channel yet. We therefor need to send
+            // and an ENDSIG in response to this packet.
+
+            frame = new Frame(ptr, Frame.SIGNAL, Frame.SIG_END);
+            if (writeFrame(frame) == false) {
+              destroyChannel(channel, false, ctype, data);
+            }
           } else {
-            channel = Channel(_openChannels[id]);
+            destroyChannel(channel, false, ctype, data);
+          }
+          break;
+        
+        default:
 
-            if (channel == null) {
-              return;
+          if (ptr == BROADCAST_ALL) {
+            return destroyWithErrorData(ctype, data);
+          }
+
+          if ((channel = Channel(_routes[ptr])) == null) {
+            return;
+          }
+
+          if (channel.connected == false) {
+            return;
+          }
+
+          if (channel.closing == false) {
+            // We havent closed our channel yet. We therefor need to send
+            // and an ENDSIG in response to this packet.
+
+            frame = new Frame(ptr, Frame.SIGNAL, Frame.SIG_END);
+            if (writeFrame(frame) == false) {
+              destroyChannel(channel, true, ctype, data);
             }
-
-            if (channel.isClosing() == false) {
-              // We havent closed our channel yet. We therefor need to send
-              // and an ENDSIG in response to this packet.
-
-              packet = new Frame(id, Frame.SIGNAL, Frame.SIG_END);
-
-              try {
-                this.writeBytes(packet);
-                this.flush();
-              } catch (error:IOError) {
-                destroy(ChannelErrorEvent.fromError(error));
-                return;
-              }
-            }
-
-            channel.destroy(event);
+          } else {
+            destroyChannel(channel, true, ctype, data);
           }
           break;
       }
@@ -566,60 +611,59 @@ package hydna.net {
     }
 
 
-    private function processResolveFrame(id:uint,
-                                         ctype:Number,
-                                         flag:Number,
-                                         data:ByteArray) : void {
-      var request:OpenRequest;
-      var event:Event;
+    private function processResolveFrame (ptr:uint,
+                                          ctype:Number,
+                                          flag:Number,
+                                          data:ByteArray) : void {
+      var channel:Channel;
+      var frame:Frame;
 
-      if ((request = getOpenRequestByPath(ctype, data))) {
-        if (flag == Frame.OPEN_SUCCESS) {
-          request.id = id;
-          flushRequests(request);
-        } else {
-          event = new ChannelErrorEvent("Unable to resolve channel path");
-          request.channel.destroy(event);
-        }
+      if ((channel = getChannelByPath(ctype, data)) == null) {
+        return;
       }
+
+      if (channel.closing) {
+        destroyChannel(channel, false, 0, null, null);
+        return;
+      }
+
+      if (flag != Frame.OPEN_SUCCESS) {
+        destroyChannel(channel, true, 0, null, "Unable to resolve channel path");
+        return;
+      }
+
+      _routes[ptr] = channel;
+      channel.ptr = ptr;
+
+      frame = new Frame(ptr,
+                        channel.openCType,
+                        Frame.OPEN,
+                        channel.mode,
+                        channel.openData);
+
+      writeFrame(frame);
     }
 
 
-    private function securityErrorHandler(event:SecurityErrorEvent) : void {
-      destroy(new ChannelErrorEvent("Security error"));
+    private function securityErrorHandler (event:SecurityErrorEvent) : void {
+      destroyWithErrorEvent(event);
     }
 
 
     // Handles connection errors
-    private function errorHandler(event:IOErrorEvent) : void {
-      destroy(ChannelErrorEvent.fromEvent(event));
+    private function errorHandler (event:IOErrorEvent) : void {
+      destroyWithErrorEvent(event);
     }
 
 
     // Handles connection close
-    private function closeHandler(event:Event) : void {
-      destroy(new ChannelErrorEvent("Disconnected from server"));
+    private function closeHandler (event:Event) : void {
+      destroyWithErrorEvent(new ChannelErrorEvent("Disconnected from server"));
     }
 
 
-    private function getOpenRequestById(id:uint) : OpenRequest {
-      var requests:Dictionary = _pendingOpenRequests;
-      var request:OpenRequest;
-      var key:Object;
-      
-      for (key in requests) {
-        request = OpenRequest(requests[key]);
-        if (request.id == id) {
-          return request;
-        }
-      }
-
-      return null;
-    }
-
-
-    private function getOpenRequestByPath(ctype:Number, data:ByteArray)
-      : OpenRequest {
+    private function getChannelByPath (ctype:Number, data:ByteArray)
+      : Channel {
       var path:String;
       var oldpos:uint;
 
@@ -627,7 +671,7 @@ package hydna.net {
         try {
           oldpos = data.position;
           path = data.readUTFBytes(data.length);
-          return OpenRequest(_pendingOpenRequests[path]);
+          return Channel(_channels[path]);
         } catch (err:EOFError) {
         } finally {
           data.position = oldpos;
@@ -638,56 +682,108 @@ package hydna.net {
     }
 
 
-    // Finalize the Socket
-    private function destroy(errorEvent:Event=null) : void {
-      var event:Event = errorEvent;
-      var pending:Dictionary = _pendingOpenRequests;
-      var openchannels:Dictionary = _openChannelsByPath;
-      var key:Object;
-      var i:Number;
-      var l:Number;
-      var queue:Array;
+    private function destroyWithEndSig (ctype:Number, data:ByteArray) : void {
+      var channels:Dictionary = _channels;
+      var event:ChannelCloseEvent;
+      var dataCopy:ByteArray;
+      var channel:Channel;
 
-      if (openchannels == null) {
-        // Do not fire destroy multiple times.
+      destroy();
 
-        return;
+      for (var key:String in channels) {
+        if ((channel = Channel(channels[key])) != null) {
+          dataCopy = new ByteArray();
+          dataCopy.writeBytes(data);
+          event = new ChannelCloseEvent(ctype, dataCopy);
+          channel.destroyHandler(event);
+        }
       }
+    }
 
-      removeEventListener(Event.CONNECT, connectHandler);
-      removeEventListener(Event.CLOSE, closeHandler);
-      removeEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
-      removeEventListener(ProgressEvent.SOCKET_DATA, receiveHandler);
-      removeEventListener(IOErrorEvent.IO_ERROR, errorHandler);
-      removeEventListener(SecurityErrorEvent.SECURITY_ERROR,
-                                  securityErrorHandler);
 
-      _pendingOpenRequests = null;
-      _openChannelsByPath = null;
-      _openChannels = null;
+    private function destroyWithErrorData (ctype:Number, data:ByteArray) : void {
+      var channels:Dictionary = _channels;
+      var event:ChannelErrorEvent;
+      var channel:Channel;
 
-      if (event == null) {
-        event = new ChannelErrorEvent("Unknown error");
+      destroy();
+
+      for (var key:String in channels) {
+        if ((channel = Channel(channels[key])) != null) {
+          event = ChannelErrorEvent.fromData(ctype, data);
+          channel.destroyHandler(event);
+        }
       }
+    }
 
-      if (pending != null) {
-        for (key in pending) {
-          OpenRequest(pending[key]).channel.destroy(event);
+
+    private function destroyWithError (error:Error) : void {
+      var channels:Dictionary = _channels;
+      var event:ChannelErrorEvent;
+      var channel:Channel;
+
+      destroy();
+
+      for (var key:String in channels) {
+        if ((channel = Channel(channels[key])) != null) {
+          event = ChannelErrorEvent.fromError(error);
+          channel.destroyHandler(event);
+        }
+      }
+    }
+
+
+    private function destroyWithErrorEvent (errorEvent:ErrorEvent) : void {
+      var channels:Dictionary = _channels;
+      var event:ChannelErrorEvent;
+      var channel:Channel;
+
+      destroy();
+
+      for (var key:String in channels) {
+        if ((channel = Channel(channels[key])) != null) {
+          event = ChannelErrorEvent.fromEvent(errorEvent);
+          channel.destroyHandler(event);
+        }
+      }
+    }
+
+
+    private function destroy () : void {
+      var idx:Number;
+
+      if (_socket != null) {
+        _socket.removeEventListener(Event.CONNECT, connectHandler);
+        _socket.removeEventListener(Event.CLOSE, closeHandler);
+        _socket.removeEventListener(ProgressEvent.SOCKET_DATA, handshakeHandler);
+        _socket.removeEventListener(ProgressEvent.SOCKET_DATA, receiveHandler);
+        _socket.removeEventListener(IOErrorEvent.IO_ERROR, errorHandler);
+        _socket.removeEventListener(SecurityErrorEvent.SECURITY_ERROR,
+                                    securityErrorHandler);
+        try {
+          _socket.close();
+        } catch (error:IOError) {
+        } finally {
+          _socket = null;
         }
       }
 
-      for (key in openchannels) {
-        Channel(openchannels[key]).destroy(event);
+      if (_url != null) {
+        idx = connectionCollections[_url].indexOf(this);
+        if (idx != -1) {
+          connectionCollections[_url].splice(idx, 1);          
+        }
+
+        if (connectionCollections[_url].length == 0) {
+          delete connectionCollections[_url];
+        }
+
+        _url = null;
       }
 
-      if (connected) {
-        close();
-      }
-
-      if (availableSockets[_id]) {
-        delete availableSockets[_id];
-      }
-
+      _channels = null;
+      _connecting = false;
+      _handshaked = false;
     }
 
   }

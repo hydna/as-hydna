@@ -35,7 +35,6 @@
 package hydna.net {
 
   import flash.utils.ByteArray;
-  import flash.utils.Endian;
 
   internal class Frame extends ByteArray {
 

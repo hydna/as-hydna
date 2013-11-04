@@ -20,7 +20,11 @@ package hydna.net {
       host = results.host;
       protocol = results.protocol;
       port = results.port;
-      path = results.path;
+      path = results.path || "/";
+
+      if (path.charAt(0) != '/') {
+        path = '/' + path;
+      }
 
       var auth:String = null;
       var index:Number;
@@ -55,7 +59,7 @@ package hydna.net {
         auth : auth,
         host : host,
         port : port,
-        path : path.substring( 1, results.path.length ),
+        path : path,
         paramStr: paramStr,
         parameters : parameters
       };

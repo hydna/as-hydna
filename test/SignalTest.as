@@ -38,7 +38,7 @@ package {
 
     override protected function run () : void {
       channel.addEventListener(ChannelEvent.SIGNAL,
-        function (e:ChannelEvent) {
+        function (e:ChannelEvent) : void {
           runDone();
         }
       )

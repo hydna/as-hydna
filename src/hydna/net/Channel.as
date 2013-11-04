@@ -34,44 +34,42 @@
 
 package hydna.net {
 
+
   import flash.events.Event;
   import flash.events.EventDispatcher;
-  import flash.events.IOErrorEvent;
   import flash.errors.IOError;
-  import flash.net.Socket;
   import flash.utils.ByteArray;
   import flash.utils.Dictionary;
 
-  import hydna.net.ChannelOpenEvent;
-  import hydna.net.ChannelErrorEvent;
-  import hydna.net.ChannelDataEvent;
-  import hydna.net.ChannelSignalEvent;
-  import hydna.net.Channel;
-  import hydna.net.ChannelMode;
-  import hydna.net.URLParser;
 
   public class Channel extends EventDispatcher {
 
     public static var PAYLOAD_MAX_SIZE:Number = Frame.PAYLOAD_MAX_SIZE;
 
-    private var _id:uint = 0;
+    private var _ptr:uint = Number.NaN;
     private var _path:String = null;
+
     private var _url:String = null;
-    private var _token:String = null;
+
+    private var _mode:Number;
+
     private var _closing:Boolean = false;
-
-    private var _connection:Connection = null;
+    private var _connecting:Boolean = false;
     private var _connected:Boolean = false;
-    private var _pendingClose:Frame = null;
-
     private var _readable:Boolean = false;
     private var _writable:Boolean = false;
     private var _emitable:Boolean = false;
 
-    private var _mode:Number;
+    private var _connection:Connection = null;
 
-    private var _openRequest:OpenRequest;
-    private var _pendingOpenRequest:OpenRequest;
+    private var _openData:ByteArray = null;
+    private var _openCType:Number = Frame.PAYLOAD_UTF;
+
+    private var _closeData:ByteArray = null;
+    private var _closeOffset:uint = 0;
+    private var _closeLength:uint = 0;
+    private var _closeCType:Number = Frame.PAYLOAD_UTF;
+
 
     /**
      *  Initializes a new Channel instance
@@ -79,47 +77,100 @@ package hydna.net {
     public function Channel() {
     }
 
+
     /**
      *  Return the connected state for this Channel instance.
      */
-    public function get connected() : Boolean {
+    public function get connected () : Boolean {
       return _connected;
     }
+
+
+    /**
+     *  Returns true if channel is connecting.
+     *
+     *  @return {Boolean} true if channel is connecting, else false.
+     */
+    public function get connecting () : Boolean {
+      return _connecting;
+    }
+
+
+    /**
+     *  Returns true if channel is closing.
+     *
+     *  @return {Boolean} true if channel is closing, else false.
+     */
+    public function get closing() : Boolean {
+      return _closing;
+    }
+
 
     /**
      *  Return true if channel is readable
      */
-    public function get readable() : Boolean {
+    public function get readable () : Boolean {
       return _connected && _readable;
     }
+
 
     /**
      *  Return true if channel is writable
      */
-    public function get writable() : Boolean {
+    public function get writable () : Boolean {
       return _connected && _writable;
     }
+
 
     /**
      *  Return true if channel emitable.
      */
-    public function get emitable() : Boolean {
+    public function get emitable () : Boolean {
       return _connected && _emitable;
     }
+
+
+    /**
+     *  Returns channel mode
+     */
+    public function get mode () : Number {
+      return _mode;
+    }
+
 
     /**
      *  Returns the url for this instance.
      *
      *  @return {String} the specified hostname.
      */
-    public function get url() : String {
-
-      if (!_url) {
-        _url = _connection.url + "/" + _id + (_token ? "?" + _token : "");
-      }
-
+    public function get url () : String {
       return _url;
     }
+
+
+    internal function get ptr () : uint {
+      return _ptr;
+    }
+
+    internal function set ptr (value:uint) : void {
+      _ptr = value;
+    }
+
+
+    internal function get path () : String {
+      return _path;
+    }
+
+
+    internal function get openData () : ByteArray {
+      return _openData;
+    }
+
+
+    internal function get openCType () : Number {
+      return _openCType;
+    }
+
 
     /**
      *  Connects the channel to the specified uri. If the connection fails
@@ -140,15 +191,16 @@ package hydna.net {
      *  in the application security sandbox. For more information, see the
      *  "Flash Player Security" chapter in Programming ActionScript 3.0.
      */
-    public function connect(url:String, mode:Number=ChannelMode.READ) : void {
-      var connurl:String;
+    public function connect (url:String, mode:Number=ChannelMode.READ) : void {
       var urlobj:Object;
-      var openFrame:Frame;
-      var request:OpenRequest;
       var token:String;
 
       if (_connection) {
         throw new Error("Already connected");
+      }
+
+      if (mode < 0 || mode > ChannelMode.READWRITEEMIT) {
+        throw new Error("Invalid mode");
       }
 
       if (url == null) {
@@ -159,63 +211,43 @@ package hydna.net {
         url = "http://" + url;
       }
 
-      if (mode < 0 || mode > ChannelMode.READWRITEEMIT) {
-        throw new Error("Invalid mode");
-      }
-
       urlobj = URLParser.parse(url);
-
-      if (urlobj.protocol == "https") {
-        throw new Error("Protocol HTTPS is currently not supported");
-      }
 
       if (urlobj.protocol !== "http") {
         throw new Error("Unsupported protocol, expected HTTP/HTTPS");
       }
 
-      _path = urlobj.path || '/';
-
-      if (_path.charAt(0) != '/') {
-        _path = '/' + _path;
+      if (urlobj.protocol == "https" && Connection.hasTlsSupport() == false) {
+        throw new Error("Protocol HTTPS is not supported on platform");
       }
 
       if (urlobj.paramStr) {
-        token = urlobj.paramStr; 
+        _openData = new ByteArray()
+        _openData.writeUTFBytes(urlobj.paramStr);        
+        _openCType = Frame.PAYLOAD_UTF;
       }
 
       _mode = mode;
+
+      try {
+        trace("Conneting to " + urlobj.path);
+        _connection = Connection.getConnection(this, urlobj);
+      } catch (err:Error) {
+        _openData = null;
+        _openCType = Frame.PAYLOAD_UTF;
+        _connection = null;
+        _mode = 0;
+        throw err;
+      }
+
+      _path = urlobj.path;
+      _url = _connection.url + _path;
 
       _readable = ((_mode & ChannelMode.READ) == ChannelMode.READ);
       _writable = ((_mode & ChannelMode.WRITE) == ChannelMode.WRITE);
       _emitable = ((_mode & ChannelMode.EMIT) == ChannelMode.EMIT);
 
-      connurl = urlobj.protocol + "://" + urlobj.host;
-
-      if (urlobj.port) {
-        connurl += ":" + urlobj.port;
-      }
-
-      if (urlobj.auth) {
-        connurl += "/" + urlobj.auth;
-      }
-
-      _connection = Connection.getConnection(connurl);
-
-      // Ref count
-      _connection.allocChannel();
-
-      request = new OpenRequest(this, _path, _mode, token);
-
-      if (_connection.requestOpen(request) == false) {
-        throw new Error("Channel is already open");
-      }
-
-      _openRequest = request;
-    }
-
-
-    public function isClosing() : Boolean {
-      return _closing;
+      _connecting = true;
     }
 
 
@@ -338,90 +370,58 @@ package hydna.net {
     }
 
 
-
-    // Internal callback for open success
-    internal function openSuccess(id:uint,
-                                  ctype:Number,
-                                  data:ByteArray) : void {
+    internal function openHandler (event:Event) : void {
       var frame:Frame;
 
-      _openRequest = null;
-      _id = id;
       _connected = true;
+      _connecting = false;
 
-      if (_pendingClose) {
+      _openData = null;
+      _openCType = Frame.PAYLOAD_UTF;
 
-        frame = _pendingClose;
-        _pendingClose = null;
-
-        // channel is changed. We need to set the channel of the
-        // frame before sending to server.
-        frame.id = id;
-
-        flushFrame(frame);
-
-      } else {
-        dispatchEvent(new ChannelOpenEvent(ctype, data));
-      }
-    }
-
-
-    internal function setPendingOpenRequest(request:OpenRequest) : Boolean {
-      
       if (_closing) {
-        // Do not allow pending request if we are not closing.
-        return false;
+        frame = new Frame(_ptr,
+                          _closeCType,
+                          Frame.SIGNAL,
+                          Frame.SIG_END,
+                          _closeData,
+                          _closeOffset,
+                          _closeLength);
+
+        _closeData = null;
+        _closeOffset = 0;
+        _closeLength = 0;
+        _closeCType = Frame.PAYLOAD_UTF;
+        flushFrame(frame);
+        return;
       }
 
-      if (_pendingOpenRequest != null) {
-        return _pendingOpenRequest.channel.setPendingOpenRequest(request);
-      }
-
-      _pendingOpenRequest = request;
-
-      return true;
+      dispatchEvent(event);
     }
 
 
-    // Internally destroy connection.
-    internal function destroy(event:Event=null) : void {
-      var connection:Connection = _connection;
-      var connected:Boolean = _connected;
-      var request:OpenRequest;
-      var id:uint = _id;
-      var path:String = _path;
-
-      _id = 0;
+    internal function destroyHandler (event:Event) : void {
       _path = null;
-      _connected = false;
-      _writable = false;
-      _readable = false;
-      _pendingClose = null;
+      _ptr = Number.NaN;
+      _url = null;
+      _mode = 0;
+
       _closing = false;
+      _connected = false;
+      _connecting = false;
+      _readable = false;
+      _writable = false;
+      _emitable = false;
 
-      request = _pendingOpenRequest;
-      _pendingOpenRequest = null;
+      _openCType = Frame.PAYLOAD_UTF;
+      _openData = null;
 
-      if (_connection) {
+      _closeCType = Frame.PAYLOAD_UTF;
+      _closeData = null;
+      _closeOffset = 0;
+      _closeLength = 0;
 
-        if (request) {
-          _connection.allocOpenRequest(request);
-          _connection.flushRequests(request);
-        }
-
-        _connection.deallocChannel(path, connected ? id : 0);
-
-        _connection = null;
-      } else {
-
-        if (request) {
-          request.channel.destroy(event);
-        }
-      }
-
-      if (event != null) {
-        dispatchEvent(event);
-      }
+      dispatchEvent(event);
     }
 
 
@@ -444,7 +444,7 @@ package hydna.net {
         throw new RangeError("Priority must be between 0 - 7");
       }
 
-      frame = new Frame(_id, ctype, Frame.DATA, priority, data, offset, length);
+      frame = new Frame(_ptr, ctype, Frame.DATA, priority, data, offset, length);
       flushFrame(frame);
     }
 
@@ -463,7 +463,7 @@ package hydna.net {
         throw new Error("You do not have permission to send signals");
       }
 
-      frame = new Frame(_id,
+      frame = new Frame(_ptr,
                         ctype,
                         Frame.SIGNAL,
                         Frame.SIG_EMIT,
@@ -490,16 +490,17 @@ package hydna.net {
       _writable = false;
       _emitable = false;
 
-      if (_openRequest != null && _connection.cancelOpen(_openRequest)) {
-        // Open request hasn't been posted yet, which means that it's
-        // safe to destroy channel immediately.
-
-        _openRequest = null;
-        destroy();
+      if (_connecting == true) {
+        // Open request is not responded to yet. Wait to send ENDSIG until
+        // we get an OPENRESP.
+        _closeCType = ctype;
+        _closeData = data;
+        _closeOffset = offset;
+        _closeLength = length;
         return;
       }
 
-      frame = new Frame(_id,
+      frame = new Frame(_ptr,
                         ctype,
                         Frame.SIGNAL,
                         Frame.SIG_END,
@@ -507,26 +508,12 @@ package hydna.net {
                         offset,
                         length);
 
-      if (_openRequest != null) {
-        // Open request is not responded to yet. Wait to send ENDSIG until
-        // we get an OPENRESP.
-
-        _pendingClose = frame;
-      } else {
-        flushFrame(frame);
-      }
+      flushFrame(frame);
     }
 
 
     private function flushFrame(frame:Frame) : void {
-      try {
-        _connection.writeBytes(frame);
-        _connection.flush();
-      } catch (error:IOError) {
-        // Something wen't terrible wrong. Queue frame and wait
-        // for a reconnect.
-        destroy(ChannelErrorEvent.fromError(error));
-      } 
+      _connection.writeFrame(frame);
     }
 
   }
