@@ -16,7 +16,11 @@ package {
 
   public class BurstTest extends Test {
 
-    private static const MESSAGES:Number = 100;
+    private static const MESSAGES:Number = 1000;
+    private static const DATA:String = "acbdsdfjkdsfjkwejrkjkerwerewkjrjewkkp" +
+                                       "vcxovxcpoopewprpweorpopsdfopfopdsofpf" +
+                                       "djasdkjsajdlkasjdjaskldjlkasjdkasjkld" +
+                                       "bvcmnmewrweorocxzcoxzo123,mfdskclzkxc";                                       
 
     private var channel:Channel;
 
@@ -35,12 +39,11 @@ package {
 
 
     override protected function run () : void {
-      var data:String = "djasdkjsajdlkasjdjaskldjlkasjdkasjkldjaskljdklasj";
       var count:Number = MESSAGES;
 
       channel.addEventListener(ChannelEvent.DATA,
         function (e:ChannelEvent) : void {
-          assertEqual(e.message, data);
+          assertEqual(e.message, DATA);
           if (--count == 0) {
             runDone();
           }
@@ -48,7 +51,7 @@ package {
       );
 
       for (var i:Number = 0; i < MESSAGES; i++) {
-        channel.write(data);
+        channel.write(DATA);
       }
     }
   }
