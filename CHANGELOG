@@ -1,0 +1,6 @@
+## v0.9.0 (2013-11-05)
+
+Features:
+
+  - Added support for TLS/SSL
+  - Refactored the complete library to support multiple connections
