@@ -211,7 +211,7 @@ package {
       var bytes:Array = new Array();
 
       for (var i:Number = 0; i < 20; i++) {
-        bytes.push(String.fromCharCode(~~(Math.random() * 10) + 50));
+        bytes.push((~~(Math.random() * 255)).toString(16));
       }
 
       path.push(now.getTime().toString(16));
