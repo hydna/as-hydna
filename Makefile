@@ -1,4 +1,5 @@
 CC = `which mxmlc`
+ASDOC = `which asdoc`
 DIST = build
 SRC = -sp src
 
@@ -14,4 +15,9 @@ performance-test: dest
 test: dest
 	$(CC) test/Runner.as -o $(DIST)/test.swf $(SRC) && open $(DIST)/test.swf
 
-.PHONY: hello-world performance-test
+doc:
+	$(ASDOC) -doc-sources src\
+					 -output doc\
+					 -main-title "Hydna bindings for Actionscript 3"
+
+.PHONY: hello-world performance-test doc
