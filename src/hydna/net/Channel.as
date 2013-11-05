@@ -148,25 +148,41 @@ package hydna.net {
     }
 
 
+    /**
+     *  @private
+     */
     internal function get ptr () : uint {
       return _ptr;
     }
 
+
+    /**
+     *  @private
+     */
     internal function set ptr (value:uint) : void {
       _ptr = value;
     }
 
 
+    /**
+     *  @private
+     */
     internal function get path () : String {
       return _path;
     }
 
 
+    /**
+     *  @private
+     */
     internal function get openData () : ByteArray {
       return _openData;
     }
 
 
+    /**
+     *  @private
+     */
     internal function get openCType () : Number {
       return _openCType;
     }
@@ -370,6 +386,9 @@ package hydna.net {
     }
 
 
+    /**
+     *  @private
+     */
     internal function openHandler (event:Event) : void {
       var frame:Frame;
 
@@ -399,7 +418,9 @@ package hydna.net {
       dispatchEvent(event);
     }
 
-
+    /**
+     *  @private
+     */
     internal function destroyHandler (event:Event) : void {
       _path = null;
       _ptr = Number.NaN;
