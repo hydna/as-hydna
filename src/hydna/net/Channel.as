@@ -246,7 +246,6 @@ package hydna.net {
       _mode = mode;
 
       try {
-        trace("Conneting to " + urlobj.path);
         _connection = Connection.getConnection(this, urlobj);
       } catch (err:Error) {
         _openData = null;
