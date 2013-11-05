@@ -20,7 +20,7 @@ package {
     private static const DATA:String = "acbdsdfjkdsfjkwejrkjkerwerewkjrjewkkp" +
                                        "vcxovxcpoopewprpweorpopsdfopfopdsofpf" +
                                        "djasdkjsajdlkasjdjaskldjlkasjdkasjkld" +
-                                       "bvcmnmewrweorocxzcoxzo123,mfdskclzkxc";                                       
+                                       "bvcmnmewrweorocxzcoxzo123,mfdskclzkxc";
 
     private var channel:Channel;
 
