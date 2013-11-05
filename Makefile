@@ -14,8 +14,4 @@ performance-test: dest
 test: dest
 	$(CC) test/Runner.as -o $(DIST)/test.swf $(SRC) && open $(DIST)/test.swf
 
-trace-mac:
-	tail -f ~/Library/Preferences/Macromedia/Flash\ Player/Logs/flashlog.txt
-
-
-.PHONY: hello-world performance-test trace-mac
+.PHONY: hello-world performance-test
