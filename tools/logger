@@ -1,2 +1,14 @@
 #!/bin/bash
-tail -f ~/Library/Preferences/Macromedia/Flash\ Player/Logs/flashlog.txt
+
+LINUX_PATH="$HOME/.macromedia/Flash_Player/Logs/flashlog.txt"
+MAC_PATH="$HOME/Library/Preferences/Macromedia/Flash Player/Logs/flashlog.txt"
+
+if [ -e "$LINUX_PATH" ]; then
+  tail -f "$LINUX_PATH";
+elif [ -e "$MAC_PATH" ]; then
+  tail -f "$MAC_PATH"
+else
+  echo "$MAC_PATH"
+  echo "Unable monitor log file. The file flashlog.txt was not found"
+  exit 1
+fi
