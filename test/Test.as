@@ -84,10 +84,9 @@ package {
 
       url = "testing.hydna.net";
 
-      if (path != null) {
-        url += path;
-      }
-
+      path = path || randomPath();
+      url += path;
+      trace(url);
       if (secure) {
         url = 'https://' + url;
       }
@@ -203,6 +202,22 @@ package {
 
       _errorMessage = message;
       dispatchEvent(new Event(ERROR));
+    }
+
+
+    private function randomPath () : String {
+      var now:Date = new Date();
+      var path:Array = new Array();
+      var bytes:Array = new Array();
+
+      for (var i:Number = 0; i < 20; i++) {
+        bytes.push(String.fromCharCode(~~(Math.random() * 10) + 50));
+      }
+
+      path.push(now.getTime().toString(16));
+      path.push(bytes.join(''));
+
+      return '/' + path.join('/');
     }
   }
 
