@@ -41,7 +41,7 @@ package {
       _name = name;
       _currentPhase = "NA";
       _channels = new Array();
-      _testTimer = new Timer(8000, 1);
+      _testTimer = new Timer(12000, 1);
       _testTimer.addEventListener(TimerEvent.TIMER_COMPLETE, timeoutHandler);
     }
 
