@@ -42,9 +42,28 @@ package hydna.net {
 
   public class ChannelEvent extends Event {
 
+    /**
+     * The OPEN constant defines the value of the type property of
+     * an open event object.
+     */
     public static const OPEN:String = "open";
+
+    /**
+     * The DATA constant defines the value of the type property of
+     * an data event object.
+     */
     public static const DATA:String = "data";
+
+    /**
+     * The SIGNAL constant defines the value of the type property of
+     * an signal event object.
+     */
     public static const SIGNAL:String = "signal";
+
+    /**
+     * The CLOSE constant defines the value of the type property of
+     * an close event object.
+     */
     public static const CLOSE:String = "close";
 
     private var _data:ByteArray = null;
