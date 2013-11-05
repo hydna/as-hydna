@@ -13,7 +13,7 @@ performance-test: dest
 	$(CC) examples/performance-test/PerformanceTest.as -o $(DIST)/performance-test.swf $(SRC)
 
 test: dest
-	$(CC) test/Runner.as -o $(DIST)/test.swf $(SRC) && open $(DIST)/test.swf
+	$(CC) test/Runner.as -o $(DIST)/test.swf $(SRC)
 
 doc:
 	$(ASDOC) -doc-sources src\
