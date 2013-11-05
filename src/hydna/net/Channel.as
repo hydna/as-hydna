@@ -229,7 +229,7 @@ package hydna.net {
 
       urlobj = URLParser.parse(url);
 
-      if (urlobj.protocol !== "http") {
+      if (urlobj.protocol !== "http" && urlobj.protocol !== "https") {
         throw new Error("Unsupported protocol, expected HTTP/HTTPS");
       }
 
