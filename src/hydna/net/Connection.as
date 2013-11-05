@@ -124,7 +124,7 @@ package hydna.net {
 
       try {
         SecureSocket = getDefinitionByName(SECURE_CLASS) as Class;
-        return SecureSocket.isSupported;
+        return Boolean(SecureSocket.isSupported);
       } catch (err:ReferenceError) {
       }
 
