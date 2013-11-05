@@ -11,14 +11,6 @@ package {
   import flash.text.TextField;
   import flash.text.TextFieldAutoSize;
   import flash.utils.ByteArray;
-  import flash.system.Security;
-
-  import flash.net.Socket;
-
-  import hydna.net.Channel;
-  import hydna.net.ChannelMode;
-  import hydna.net.ChannelDataEvent;
-  import hydna.net.ChannelSignalEvent;
 
 
   /**
@@ -37,14 +29,12 @@ package {
     
 
     public function Runner() {
-      var channel:Channel;
-
-      Security.allowDomain("*");
 
       _tests = new Array();
 
       _tests.push(BurstTest);
       _tests.push(SignalTest);
+      _tests.push(TlsTest);
 
       _total = _tests.length;
 
@@ -75,7 +65,7 @@ package {
 
     private function nextTest () : void {
       var TestClass:Object;
-      trace("Next test");
+
       if ((TestClass = _tests.pop())) {
         runTest(TestClass);
         return;
