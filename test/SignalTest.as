@@ -17,6 +17,7 @@ package {
   public class SignalTest extends Test {
 
     private static const PING:String = "ping";
+    private static const PONG:String = "pong";
 
     private var channel:Channel;
 
@@ -39,6 +40,7 @@ package {
     override protected function run () : void {
       channel.addEventListener(ChannelEvent.SIGNAL,
         function (e:ChannelEvent) : void {
+          assertEqual(e.message, PONG);
           runDone();
         }
       )
