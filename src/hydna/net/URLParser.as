@@ -1,6 +1,9 @@
 
 package hydna.net {
 
+  /**
+   * @private
+   */
   public class URLParser {
 
     public static var url:String;
