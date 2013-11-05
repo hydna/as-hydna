@@ -76,7 +76,9 @@ package {
       }
     }
 
-    protected function createChannel (mode:Number, path:String=null) : Channel {
+    protected function createChannel (mode:Number,
+                                      path:String=null,
+                                      secure:Boolean=false) : Channel {
       var channel:Channel = new Channel();
       var url:String;
 
@@ -84,6 +86,10 @@ package {
 
       if (path != null) {
         url += path;
+      }
+
+      if (secure) {
+        url = 'https://' + url;
       }
 
       channel.connect(url, mode);
@@ -192,6 +198,8 @@ package {
       if (_errorMessage) {
         return;
       }
+
+      _testTimer.stop();
 
       _errorMessage = message;
       dispatchEvent(new Event(ERROR));
