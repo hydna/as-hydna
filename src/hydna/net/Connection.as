@@ -300,10 +300,13 @@ package hydna.net {
           _socket.addEventListener(ProgressEvent.SOCKET_DATA, receiveHandler);
 
           for each (var channel:Channel in _channels) {
-            path = new ByteArray();
-            path.writeUTFBytes(channel.path);
-            frame = new Frame(0, Frame.PAYLOAD_UTF, Frame.RESOLVE, 0, path);
-            writeFrame(frame);
+            if (channel.resolved == false) {
+              channel.resolved = true;
+              path = new ByteArray();
+              path.writeUTFBytes(channel.path);
+              frame = new Frame(0, Frame.PAYLOAD_UTF, Frame.RESOLVE, 0, path);
+              writeFrame(frame);
+            }
           }
           return;
 
@@ -328,6 +331,7 @@ package hydna.net {
       _refcount++;
 
       if (_handshaked) {
+        channel.resolved = true;
         data = new ByteArray();
         data.writeUTFBytes(path);
         frame = new Frame(0, Frame.PAYLOAD_UTF, Frame.RESOLVE, 0, data);

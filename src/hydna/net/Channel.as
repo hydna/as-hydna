@@ -54,6 +54,7 @@ package hydna.net {
     private var _mode:Number;
 
     private var _closing:Boolean = false;
+    private var _resolved:Boolean = false;
     private var _connecting:Boolean = false;
     private var _connected:Boolean = false;
     private var _readable:Boolean = false;
@@ -161,6 +162,22 @@ package hydna.net {
      */
     internal function set ptr (value:uint) : void {
       _ptr = value;
+    }
+
+
+    /**
+     *  @private
+     */
+    internal function get resolved () : boolean {
+      return _resolved;
+    }
+
+
+    /**
+     *  @private
+     */
+    internal function set resolved (value:boolean) : void {
+      _resolved = value;
     }
 
 
