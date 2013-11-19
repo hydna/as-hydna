@@ -86,7 +86,7 @@ package {
 
       path = path || randomPath();
       url += path;
-      trace(url);
+
       if (secure) {
         url = 'https://' + url;
       }
