@@ -38,7 +38,7 @@ package hydna.net {
 
   internal class Frame extends ByteArray {
 
-    internal static const HEADER_SIZE:Number = 0x07;
+    internal static const HEADER_SIZE:Number = 0x05;
 
     // Opcodes
     internal static const KEEPALIVE:Number = 0x00;

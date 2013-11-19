@@ -411,10 +411,10 @@ package hydna.net {
                         _receiveBuffer.length,
                         _socket.bytesAvailable);
 
-      while (_receiveBuffer.bytesAvailable >= Frame.HEADER_SIZE) {
+      while (_receiveBuffer.bytesAvailable >= 2) {
         size = _receiveBuffer.readUnsignedShort();
 
-        if (_receiveBuffer.bytesAvailable < (size - 2)) {
+        if (_receiveBuffer.bytesAvailable < size) {
           _receiveBuffer.position -= 2;
           return;
         }
