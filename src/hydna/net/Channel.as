@@ -168,7 +168,7 @@ package hydna.net {
     /**
      *  @private
      */
-    internal function get resolved () : boolean {
+    internal function get resolved () : Boolean {
       return _resolved;
     }
 
@@ -176,7 +176,7 @@ package hydna.net {
     /**
      *  @private
      */
-    internal function set resolved (value:boolean) : void {
+    internal function set resolved (value:Boolean) : void {
       _resolved = value;
     }
 

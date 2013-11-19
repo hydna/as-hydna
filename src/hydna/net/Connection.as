@@ -331,7 +331,7 @@ package hydna.net {
       _refcount++;
 
       if (_handshaked) {
-        channel.resolved = true;
+        instance.resolved = true;
         data = new ByteArray();
         data.writeUTFBytes(path);
         frame = new Frame(0, Frame.PAYLOAD_UTF, Frame.RESOLVE, 0, data);
