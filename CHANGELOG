@@ -1,3 +1,12 @@
+## v0.9.1 (2013-11-19)
+
+Features:
+
+  - Improved tests
+
+Bug fixes:
+  - Fixed issue where channels could be resolved multiple times
+
 ## v0.9.0 (2013-11-05)
 
 Features:
