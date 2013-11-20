@@ -39,12 +39,15 @@ package hydna.net {
   import flash.events.IOErrorEvent;
   import flash.events.ProgressEvent;
   import flash.events.SecurityErrorEvent;
+  import flash.events.TimerEvent;
   import flash.errors.IOError;
   import flash.errors.EOFError;
   import flash.net.Socket;
   import flash.utils.ByteArray;
   import flash.utils.Dictionary;
   import flash.utils.getDefinitionByName;
+  import flash.utils.Timer;
+  import flash.utils.getTimer;
 
 
   // Internal wrapper around flash.net.Socket
@@ -81,6 +84,8 @@ package hydna.net {
     private var _routes:Dictionary;
     private var _refcount:Number = 0;
 
+    private var _keepAliveTimer:Timer;
+    private var _lastSentMessage:Number = 0;
 
     {
       connectionCollections = new Dictionary();
@@ -169,7 +174,8 @@ package hydna.net {
       _receiveBuffer = new ByteArray();
       _channels = new Dictionary();
       _routes = new Dictionary();
-
+      _keepAliveTimer = new Timer(5000);
+      _keepAliveTimer.addEventListener(TimerEvent.TIMER, checkKeepAlive);
     }
 
 
@@ -298,6 +304,7 @@ package hydna.net {
 
           _receiveBuffer = new ByteArray();
           _socket.addEventListener(ProgressEvent.SOCKET_DATA, receiveHandler);
+          _keepAliveTimer.start();
 
           for each (var channel:Channel in _channels) {
             if (channel.resolved == false) {
@@ -376,6 +383,19 @@ package hydna.net {
       }
     }
 
+    private function checkKeepAlive (event:TimerEvent) : void {
+      var now:Number = getTimer();
+      var frame:Frame;
+
+      if (now - _lastSentMessage >= 15000) {
+        frame = new Frame(0, Frame.KEEPALIVE, 0);
+        try {
+          writeFrame(frame);
+        } catch (e:Error) {
+        }
+      }
+
+    }
 
     private function dispatchChannelEvent (target:Channel, event:Event) : void {
       try {
@@ -389,6 +409,7 @@ package hydna.net {
       try {
         _socket.writeBytes(frame);
         _socket.flush();
+        _lastSentMessage = getTimer();
       } catch (error:IOError) {
         destroyWithError(error);
         return true;
@@ -783,6 +804,11 @@ package hydna.net {
         }
 
         _url = null;
+      }
+
+      if (_keepAliveTimer != null) {
+        _keepAliveTimer.stop();
+        _keepAliveTimer = null;
       }
 
       _channels = null;
