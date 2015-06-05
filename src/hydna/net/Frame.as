@@ -59,7 +59,7 @@ package hydna.net {
     internal static const SIG_END:Number = 0x1;
 
     // Upper payload limit
-    internal static const PAYLOAD_MAX_SIZE:Number = 0xFFFFFF - HEADER_SIZE;
+    internal static const PAYLOAD_MAX_SIZE:Number = 0xFFFF - HEADER_SIZE;
 
     internal static const FLAG_BITMASK:Number = 0x7;
 
